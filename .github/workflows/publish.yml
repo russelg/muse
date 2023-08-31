@@ -49,7 +49,7 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           push: true
-          tags: russelg/muse:${{ github.sha }}-${{ matrix.tagged-platform }}
+          tags: russelgazimov/muse:${{ github.sha }}-${{ matrix.tagged-platform }}
           platforms: ${{ matrix.build-arch }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache,mode=min
@@ -77,17 +77,17 @@ jobs:
         id: get-tags
         uses: Surgo/docker-smart-tag-action@v1
         with:
-          docker_image: russelg/muse
+          docker_image: russelgazimov/muse
 
       - name: Combine tags
-        run: docker buildx imagetools create $(echo '${{ steps.get-tags.outputs.tag }}' | tr "," "\0" | xargs -0 printf -- '-t %s ') 'russelg/muse:${{ github.sha }}-arm64' 'russelg/muse:${{ github.sha }}-amd64'
+        run: docker buildx imagetools create $(echo '${{ steps.get-tags.outputs.tag }}' | tr "," "\0" | xargs -0 printf -- '-t %s ') 'russelgazimov/muse:${{ github.sha }}-arm64' 'russelgazimov/muse:${{ github.sha }}-amd64'
 
       - name: Update Docker Hub description
         uses: peter-evans/dockerhub-description@v2.4.3
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
-          DOCKERHUB_REPOSITORY: russelg/muse
+          DOCKERHUB_REPOSITORY: russelgazimov/muse
 
   release:
     name: Create GitHub release

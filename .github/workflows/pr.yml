@@ -52,7 +52,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: russelg/muse:${{ github.event.pull_request.head.sha }}-${{ matrix.tagged-platform }}
+          tags: russelgazimov/muse:${{ github.event.pull_request.head.sha }}-${{ matrix.tagged-platform }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache,mode=min
           platforms: ${{ matrix.build-arch }}
@@ -75,7 +75,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Combine tags
-        run: docker buildx imagetools create -t 'russelg/muse:pr-${{ github.event.number }}' -t 'russelg/muse:${{ github.event.pull_request.head.sha }}' 'russelg/muse:${{ github.event.pull_request.head.sha }}-arm64' 'russelg/muse:${{ github.event.pull_request.head.sha }}-amd64'
+        run: docker buildx imagetools create -t 'russelgazimov/muse:pr-${{ github.event.number }}' -t 'russelgazimov/muse:${{ github.event.pull_request.head.sha }}' 'russelgazimov/muse:${{ github.event.pull_request.head.sha }}-arm64' 'russelgazimov/muse:${{ github.event.pull_request.head.sha }}-amd64'
 
       - name: Create comment
         uses: marocchino/sticky-pull-request-comment@v2
@@ -84,7 +84,7 @@ jobs:
           message: |
             #### :package: A new release has been made for this pull request.
 
-            To play around with this PR, pull `russelg/muse:pr-${{ github.event.number }}` or `russelg/muse:${{ github.event.pull_request.head.sha }}`.
+            To play around with this PR, pull `russelgazimov/muse:pr-${{ github.event.number }}` or `russelgazimov/muse:${{ github.event.pull_request.head.sha }}`.
 
             Images are available for x86_64 and ARM64.
 
