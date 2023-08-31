@@ -119,10 +119,16 @@ export default class AddQueryToQueue {
     }
 
     newSongs.forEach(song => {
+      const requestedByName = ('nickname' in interaction.member!
+        ? interaction.member.nickname
+        : interaction.member!.nick)
+      ?? interaction.member!.user.username;
+
       player.add({
         ...song,
         addedInChannelId: interaction.channel!.id,
         requestedBy: interaction.member!.user.id,
+        requestedByName,
       }, {immediate: addToFrontOfQueue ?? false});
     });
 

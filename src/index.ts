@@ -2,10 +2,12 @@ import makeDir from 'make-dir';
 import path from 'path';
 import container from './inversify.config.js';
 import {TYPES} from './types.js';
+import Api from './api.js';
 import Bot from './bot.js';
 import Config from './services/config.js';
 import FileCacheProvider from './services/file-cache.js';
 
+const api = container.get<Api>(TYPES.Api);
 const bot = container.get<Bot>(TYPES.Bot);
 
 const startBot = async () => {
@@ -19,6 +21,8 @@ const startBot = async () => {
   await container.get<FileCacheProvider>(TYPES.FileCache).cleanup();
 
   await bot.register();
+
+  api.start();
 };
 
 export {startBot};

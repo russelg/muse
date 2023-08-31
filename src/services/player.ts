@@ -44,6 +44,7 @@ export interface SongMetadata {
 export interface QueuedSong extends SongMetadata {
   addedInChannelId: Snowflake;
   requestedBy: string;
+  requestedByName: string;
 }
 
 export enum STATUS {
@@ -333,12 +334,24 @@ export default class {
     return null;
   }
 
+  getQueuePosition(): number {
+    return this.queuePosition;
+  }
+
   /**
    * Returns queue, not including the current song.
    * @returns {QueuedSong[]}
    */
   getQueue(): QueuedSong[] {
     return this.queue.slice(this.queuePosition + 1);
+  }
+
+  /**
+   * Returns queue, before the current song.
+   * @returns {QueuedSong[]}
+   */
+  getQueueHistory(): QueuedSong[] {
+    return this.queue.slice(0, this.queuePosition);
   }
 
   add(song: QueuedSong, {immediate = false} = {}): void {
