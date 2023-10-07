@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.5] - 2023-10-07
+
+- Bumped @distube/ytdl-core
+- Added soundcloud support
+- Added youtube cookie support
+
 ## [2.4.2] - 2023-08-12
 
 ### Fixed

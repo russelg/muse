@@ -19,10 +19,13 @@ import {
 import FileCacheProvider from './file-cache.js';
 import debug from '../utils/debug.js';
 import {getGuildSettings} from '../utils/get-guild-settings';
+import Config from './config';
+import {promises as fs} from 'fs';
 
 export enum MediaSource {
   Youtube,
   HLS,
+  SoundCloud,
 }
 
 export interface QueuedPlaylist {
@@ -34,6 +37,7 @@ export interface SongMetadata {
   title: string;
   artist: string;
   url: string;
+  originalUrl: string | null;
   length: number;
   offset: number;
   playlist: QueuedPlaylist | null;
@@ -76,7 +80,7 @@ export default class {
   private readonly fileCache: FileCacheProvider;
   private disconnectTimer: NodeJS.Timeout | null = null;
 
-  constructor(fileCache: FileCacheProvider, guildId: string) {
+  constructor(fileCache: FileCacheProvider, guildId: string, private config: Config) {
     this.fileCache = fileCache;
     this.guildId = guildId;
   }
@@ -426,6 +430,10 @@ export default class {
       return this.createReadStream({url: song.url, cacheKey: song.url});
     }
 
+    if (song.source === MediaSource.SoundCloud) {
+      return this.createReadStream({url: song.url, cacheKey: song.originalUrl ?? song.url});
+    }
+
     let ffmpegInput: string | null;
     const ffmpegInputOptions: string[] = [];
     let shouldCacheVideo = false;
@@ -435,14 +443,27 @@ export default class {
     ffmpegInput = await this.fileCache.getPathFor(this.getHashForCache(song.url));
 
     if (!ffmpegInput) {
+      let agent: ytdl.Agent | undefined;
+      if (this.config.YOUTUBE_COOKIE_JSON_PATH) {
+        try {
+          const cookies = await fs.readFile(this.config.YOUTUBE_COOKIE_JSON_PATH, 'utf8');
+          agent = ytdl.createAgent(JSON.parse(cookies));
+        } catch (e) {
+          console.error('Failed to load cookies', e);
+          agent = undefined;
+        }
+      }
+
       // Not yet cached, must download
-      const info = await ytdl.getInfo(song.url);
+      const info = await ytdl.getInfo(song.url, {agent});
 
       const formats = info.formats as YTDLVideoFormat[];
 
       const filter = (format: ytdl.videoFormat): boolean => format.codecs === 'opus' && format.container === 'webm' && format.audioSampleRate !== undefined && parseInt(format.audioSampleRate, 10) === 48000;
 
       format = formats.find(filter);
+
+      debug(info, formats, format);
 
       const nextBestFormat = (formats: ytdl.videoFormat[]): ytdl.videoFormat | undefined => {
         if (formats[0].isLive) {

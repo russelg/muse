@@ -207,6 +207,7 @@ export default class {
       length: toSeconds(parse(video.contentDetails.duration)),
       offset: 0,
       url: video.id,
+      originalUrl: null,
       playlist: queuedPlaylist ?? null,
       isLive: video.snippet.liveBroadcastContent === 'live',
       thumbnailUrl: video.snippet.thumbnails.medium.url,

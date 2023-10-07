@@ -15,5 +15,6 @@ export const TYPES = {
     GetSongs: Symbol('GetSongs'),
     YoutubeAPI: Symbol('YoutubeAPI'),
     SpotifyAPI: Symbol('SpotifyAPI'),
+    SoundcloudAPI: Symbol('SoundcloudAPI'),
   },
 };

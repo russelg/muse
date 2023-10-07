@@ -76,6 +76,7 @@ typings/
 # dotenv environment variables file
 .env
 .env.test
+cookies.json
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache

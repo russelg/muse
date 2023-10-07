@@ -90,6 +90,24 @@ export default class AddQueryToQueue {
         }
 
         newSongs.push(...convertedSongs);
+      } else if (url.host === 'soundcloud.com') {
+        if (url.pathname.includes('/sets/')) {
+          const songs = await this.getSongs.soundcloudPlaylist(query);
+
+          if (songs) {
+            newSongs.push(...songs);
+          } else {
+            throw new Error('that doesn\'t exist');
+          }
+        } else {
+          const song = await this.getSongs.soundcloud(query);
+
+          if (song) {
+            newSongs.push(song);
+          } else {
+            throw new Error('that doesn\'t exist');
+          }
+        }
       } else {
         const song = await this.getSongs.httpLiveStream(query);
 

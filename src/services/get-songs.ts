@@ -5,15 +5,18 @@ import {TYPES} from '../types.js';
 import ffmpeg from 'fluent-ffmpeg';
 import YoutubeAPI from './youtube-api.js';
 import SpotifyAPI, {SpotifyTrack} from './spotify-api.js';
+import SoundcloudAPI from './soundcloud-api.js';
 
 @injectable()
 export default class {
   private readonly youtubeAPI: YoutubeAPI;
   private readonly spotifyAPI: SpotifyAPI;
+  private readonly soundcloudAPI: SoundcloudAPI;
 
-  constructor(@inject(TYPES.Services.YoutubeAPI) youtubeAPI: YoutubeAPI, @inject(TYPES.Services.SpotifyAPI) spotifyAPI: SpotifyAPI) {
+  constructor(@inject(TYPES.Services.YoutubeAPI) youtubeAPI: YoutubeAPI, @inject(TYPES.Services.SpotifyAPI) spotifyAPI: SpotifyAPI, @inject(TYPES.Services.SoundcloudAPI) soundcloudAPI: SoundcloudAPI) {
     this.youtubeAPI = youtubeAPI;
     this.spotifyAPI = spotifyAPI;
+    this.soundcloudAPI = soundcloudAPI;
   }
 
   async youtubeVideoSearch(query: string, shouldSplitChapters: boolean): Promise<SongMetadata[]> {
@@ -58,6 +61,15 @@ export default class {
     }
   }
 
+  async soundcloud(url: string): Promise<SongMetadata> {
+    return this.soundcloudAPI.getSong(url);
+  }
+
+  async soundcloudPlaylist(url: string): Promise<SongMetadata[]> {
+    const songs = await this.soundcloudAPI.getPlaylist(url);
+    return songs.filter(song => Boolean(song)) as SongMetadata[];
+  }
+
   async httpLiveStream(url: string): Promise<SongMetadata> {
     return new Promise((resolve, reject) => {
       ffmpeg(url).ffprobe((err, _) => {
@@ -67,6 +79,7 @@ export default class {
 
         resolve({
           url,
+          originalUrl: url,
           source: MediaSource.HLS,
           isLive: true,
           title: url,

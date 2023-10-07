@@ -40,6 +40,7 @@ import Unskip from './commands/unskip.js';
 import ThirdParty from './services/third-party.js';
 import FileCacheProvider from './services/file-cache.js';
 import KeyValueCacheProvider from './services/key-value-cache.js';
+import SoundcloudAPI from './services/soundcloud-api';
 
 const container = new Container();
 
@@ -62,6 +63,7 @@ container.bind<GetSongs>(TYPES.Services.GetSongs).to(GetSongs).inSingletonScope(
 container.bind<AddQueryToQueue>(TYPES.Services.AddQueryToQueue).to(AddQueryToQueue).inSingletonScope();
 container.bind<YoutubeAPI>(TYPES.Services.YoutubeAPI).to(YoutubeAPI).inSingletonScope();
 container.bind<SpotifyAPI>(TYPES.Services.SpotifyAPI).to(SpotifyAPI).inSingletonScope();
+container.bind<SoundcloudAPI>(TYPES.Services.SoundcloudAPI).to(SoundcloudAPI).inSingletonScope();
 
 // Commands
 [

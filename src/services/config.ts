@@ -12,8 +12,10 @@ export const DATA_DIR = path.resolve(process.env.DATA_DIR ? process.env.DATA_DIR
 const CONFIG_MAP = {
   DISCORD_TOKEN: process.env.DISCORD_TOKEN,
   YOUTUBE_API_KEY: process.env.YOUTUBE_API_KEY,
+  YOUTUBE_COOKIE_JSON_PATH: process.env.YOUTUBE_COOKIE_JSON_PATH ?? '',
   SPOTIFY_CLIENT_ID: process.env.SPOTIFY_CLIENT_ID,
   SPOTIFY_CLIENT_SECRET: process.env.SPOTIFY_CLIENT_SECRET,
+  SOUNDCLOUD_CLIENT_ID: process.env.SOUNDCLOUD_CLIENT_ID ?? '',
   WEBSERVER_PORT: process.env.WEBSERVER_PORT ?? 80,
   REGISTER_COMMANDS_ON_BOT: process.env.REGISTER_COMMANDS_ON_BOT === 'true',
   DATA_DIR,
@@ -37,8 +39,10 @@ export default class Config {
   readonly DISCORD_TOKEN!: string;
   readonly WEBSERVER_PORT!: number;
   readonly YOUTUBE_API_KEY!: string;
+  readonly YOUTUBE_COOKIE_JSON_PATH!: string;
   readonly SPOTIFY_CLIENT_ID!: string;
   readonly SPOTIFY_CLIENT_SECRET!: string;
+  readonly SOUNDCLOUD_CLIENT_ID!: string;
   readonly REGISTER_COMMANDS_ON_BOT!: boolean;
   readonly DATA_DIR!: string;
   readonly CACHE_DIR!: string;

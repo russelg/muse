@@ -23,9 +23,13 @@ const transformSong = (song: QueuedSong, index?: number) => {
   return data;
 };
 
-const getSongTitleInfo = ({title, url, offset, source}: QueuedSong) => {
+const getSongTitleInfo = ({title, url, originalUrl, offset, source}: QueuedSong) => {
   if (source === MediaSource.HLS) {
     return {title, url, youtubeId: null, source: 'HLS'};
+  }
+
+  if (source === MediaSource.SoundCloud) {
+    return {title, url: originalUrl, youtubeId: null, source: 'Soundcloud'};
   }
 
   const songTitle = title.replace(/\[.*\]/, '').trim();

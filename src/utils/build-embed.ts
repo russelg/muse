@@ -13,9 +13,13 @@ const getMaxSongTitleLength = (title: string) => {
   return nonASCII.test(title) ? 28 : 48;
 };
 
-const getSongTitle = ({title, url, offset, source}: QueuedSong, shouldTruncate = false) => {
+const getSongTitle = ({title, url, originalUrl, offset, source}: QueuedSong, shouldTruncate = false) => {
   if (source === MediaSource.HLS) {
     return `[${title}](${url})`;
+  }
+
+  if (source === MediaSource.SoundCloud) {
+    return `[${title}](${originalUrl ?? url})`;
   }
 
   const cleanSongTitle = title.replace(/\[.*\]/, '').trim();
