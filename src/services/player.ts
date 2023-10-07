@@ -80,7 +80,7 @@ export default class {
   private readonly fileCache: FileCacheProvider;
   private disconnectTimer: NodeJS.Timeout | null = null;
 
-  constructor(fileCache: FileCacheProvider, guildId: string, private config: Config) {
+  constructor(fileCache: FileCacheProvider, guildId: string, private readonly config: Config) {
     this.fileCache = fileCache;
     this.guildId = guildId;
   }
