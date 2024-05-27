@@ -20,7 +20,6 @@ import FileCacheProvider from './file-cache.js';
 import debug from '../utils/debug.js';
 import {getGuildSettings} from '../utils/get-guild-settings.js';
 import {buildPlayingMessageEmbed} from '../utils/build-embed.js';
-import Config from './config.js';
 import ThirdParty from './third-party.js';
 import Soundcloud from 'soundcloud.ts';
 
