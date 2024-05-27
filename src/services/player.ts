@@ -1,14 +1,14 @@
 import {VoiceChannel, Snowflake} from 'discord.js';
 import {Readable} from 'stream';
 import hasha from 'hasha';
-import ytdl, {videoFormat} from '@distube/ytdl-core';
+import ytdl, {videoFormat} from 'ytdl-core';
 import {WriteStream} from 'fs-capacitor';
 import ffmpeg from 'fluent-ffmpeg';
 import shuffle from 'array-shuffle';
 import {
   AudioPlayer,
   AudioPlayerState,
-  AudioPlayerStatus,
+  AudioPlayerStatus, AudioResource,
   createAudioPlayer,
   createAudioResource, DiscordGatewayAdapterCreator,
   joinVoiceChannel,
@@ -18,7 +18,8 @@ import {
 } from '@discordjs/voice';
 import FileCacheProvider from './file-cache.js';
 import debug from '../utils/debug.js';
-import {getGuildSettings} from '../utils/get-guild-settings';
+import {getGuildSettings} from '../utils/get-guild-settings.js';
+import {buildPlayingMessageEmbed} from '../utils/build-embed.js';
 import Config from './config';
 import {promises as fs} from 'fs';
 
@@ -63,15 +64,21 @@ export interface PlayerEvents {
 
 type YTDLVideoFormat = videoFormat & {loudnessDb?: number};
 
+export const DEFAULT_VOLUME = 100;
+
 export default class {
   public voiceConnection: VoiceConnection | null = null;
   public status = STATUS.PAUSED;
   public guildId: string;
   public loopCurrentSong = false;
-
+  public loopCurrentQueue = false;
+  private currentChannel: VoiceChannel | undefined;
   private queue: QueuedSong[] = [];
   private queuePosition = 0;
   private audioPlayer: AudioPlayer | null = null;
+  private audioResource: AudioResource | null = null;
+  private volume?: number;
+  private defaultVolume: number = DEFAULT_VOLUME;
   private nowPlaying: QueuedSong | null = null;
   private playPositionInterval: NodeJS.Timeout | undefined;
   private lastSongURL = '';
@@ -86,6 +93,11 @@ export default class {
   }
 
   async connect(channel: VoiceChannel): Promise<void> {
+    // Always get freshest default volume setting value
+    const settings = await getGuildSettings(this.guildId);
+    const {defaultVolume = DEFAULT_VOLUME} = settings;
+    this.defaultVolume = defaultVolume;
+
     this.voiceConnection = joinVoiceChannel({
       channelId: channel.id,
       guildId: channel.guild.id,
@@ -106,6 +118,8 @@ export default class {
       oldNetworking?.off('stateChange', networkStateChangeHandler);
       newNetworking?.on('stateChange', networkStateChangeHandler);
       /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
+
+      this.currentChannel = channel;
     });
   }
 
@@ -121,6 +135,7 @@ export default class {
 
       this.voiceConnection = null;
       this.audioPlayer = null;
+      this.audioResource = null;
     }
   }
 
@@ -156,9 +171,7 @@ export default class {
       },
     });
     this.voiceConnection.subscribe(this.audioPlayer);
-    this.audioPlayer.play(createAudioResource(stream, {
-      inputType: StreamType.WebmOpus,
-    }));
+    this.playAudioPlayerResource(this.createAudioStream(stream));
     this.attachListeners();
     this.startTrackingPosition(positionSeconds);
 
@@ -221,11 +234,7 @@ export default class {
         },
       });
       this.voiceConnection.subscribe(this.audioPlayer);
-      const resource = createAudioResource(stream, {
-        inputType: StreamType.WebmOpus,
-      });
-
-      this.audioPlayer.play(resource);
+      this.playAudioPlayerResource(this.createAudioStream(stream));
 
       this.attachListeners();
 
@@ -421,6 +430,17 @@ export default class {
     return this.queue[this.queuePosition + to];
   }
 
+  setVolume(level: number): void {
+    // Level should be a number between 0 and 100 = 0% => 100%
+    this.volume = level;
+    this.setAudioPlayerVolume(level);
+  }
+
+  getVolume(): number {
+    // Only use default volume if player volume is not already set (in the event of a reconnect we shouldn't reset)
+    return this.volume ?? this.defaultVolume;
+  }
+
   private getHashForCache(url: string): string {
     return hasha(url);
   }
@@ -579,8 +599,27 @@ export default class {
       return;
     }
 
+    // Automatically re-add current song to queue
+    if (this.loopCurrentQueue && newState.status === AudioPlayerStatus.Idle && this.status === STATUS.PLAYING) {
+      const currentSong = this.getCurrent();
+
+      if (currentSong) {
+        this.add(currentSong);
+      } else {
+        throw new Error('No song currently playing.');
+      }
+    }
+
     if (newState.status === AudioPlayerStatus.Idle && this.status === STATUS.PLAYING) {
       await this.forward(1);
+      // Auto announce the next song if configured to
+      const settings = await getGuildSettings(this.guildId);
+      const {autoAnnounceNextSong} = settings;
+      if (autoAnnounceNextSong && this.currentChannel) {
+        await this.currentChannel.send({
+          embeds: this.getCurrent() ? [buildPlayingMessageEmbed(this)] : [],
+        });
+      }
     }
   }
 
@@ -620,5 +659,25 @@ export default class {
 
       resolve(returnedStream);
     });
+  }
+
+  private createAudioStream(stream: Readable) {
+    return createAudioResource(stream, {
+      inputType: StreamType.WebmOpus,
+      inlineVolume: true,
+    });
+  }
+
+  private playAudioPlayerResource(resource: AudioResource) {
+    if (this.audioPlayer !== null) {
+      this.audioResource = resource;
+      this.setAudioPlayerVolume();
+      this.audioPlayer.play(this.audioResource);
+    }
+  }
+
+  private setAudioPlayerVolume(level?: number) {
+    // Audio resource expects a float between 0 and 1 to represent level percentage
+    this.audioResource?.volume?.setVolume((level ?? this.getVolume()) / 100);
   }
 }

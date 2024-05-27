@@ -6,11 +6,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.4.5] - 2023-10-07
-
-- Bumped @distube/ytdl-core
+### Added
 - Added soundcloud support
 - Added youtube cookie support
+
+## [2.8.1] - 2024-04-28
+
+### Fixed
+
+- Fixed import issue that broke Muse inside of Docker. Thanks @sonroyaalmerol!
+
+## [2.8.0] - 2024-04-28
+
+### Added
+- SponsorBlock is now supported as an opt-in feature and will skip non-music segments of videos when possible. Check the readme for config details. Thanks @Charlignon!
+- There's a new config setting to make Muse responses when adding items to the queue visible only to the requester. Thanks @Sheeley7!
+
+## [2.7.1] - 2024-03-18
+
+### Changed
+- Reduced Docker image size
+
+## [2.7.0] - 2024-03-12
+
+### Added 🔊
+- A `/volume` command is now available.
+- Set the default volume with `/config set-default-volume`
+
+## [2.6.0] - 2024-03-03
+
+### Added
+- Muse can now auto-announce new tracks in your voice channel on the transition of a new track. Use `/config set-auto-announce-next-song True` to enable.
+
+## [2.5.0] - 2024-01-16
+
+### Added
+- Added `/loop-queue`
+
+## [2.4.4] - 2023-12-21
+
+- Optimized Docker container to run JS code directly with node instead of yarn, npm and tsx. Reduces memory usage.
+
+## [2.4.3] - 2023-09-10
+
+### Fixed
+
+- Switched ytdl-core to patched version
 
 ## [2.4.2] - 2023-08-12
 
@@ -271,7 +312,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial release
 
-[unreleased]: https://github.com/codetheweb/muse/compare/v2.4.2...HEAD
+[unreleased]: https://github.com/codetheweb/muse/compare/v2.8.1...HEAD
+[2.8.1]: https://github.com/codetheweb/muse/compare/v2.8.0...v2.8.1
+[2.8.0]: https://github.com/codetheweb/muse/compare/v2.7.1...v2.8.0
+[2.7.1]: https://github.com/codetheweb/muse/compare/v2.7.0...v2.7.1
+[2.7.0]: https://github.com/codetheweb/muse/compare/v2.6.0...v2.7.0
+[2.6.0]: https://github.com/codetheweb/muse/compare/v2.5.0...v2.6.0
+[2.5.0]: https://github.com/codetheweb/muse/compare/v2.4.4...v2.5.0
+[2.4.4]: https://github.com/codetheweb/muse/compare/v2.4.3...v2.4.4
+[2.4.3]: https://github.com/codetheweb/muse/compare/v2.4.2...v2.4.3
 [2.4.2]: https://github.com/codetheweb/muse/compare/v2.4.1...v2.4.2
 [2.4.1]: https://github.com/codetheweb/muse/compare/v2.4.0...v2.4.1
 [2.4.0]: https://github.com/codetheweb/muse/compare/v2.3.1...v2.4.0
