@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Added soundcloud support
-- Added youtube cookie support
+- Switched ytdl-core to play-dl (should resolve issues with longer videos)
 
 ## [2.8.1] - 2024-04-28
 

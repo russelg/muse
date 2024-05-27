@@ -77,6 +77,7 @@ typings/
 .env
 .env.test
 cookies.json
+.data
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache

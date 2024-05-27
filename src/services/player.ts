@@ -1,7 +1,7 @@
 import {VoiceChannel, Snowflake} from 'discord.js';
 import {Readable} from 'stream';
 import hasha from 'hasha';
-import ytdl, {videoFormat} from 'ytdl-core';
+import {InfoData, video_info, stream_from_info} from 'play-dl';
 import {WriteStream} from 'fs-capacitor';
 import ffmpeg from 'fluent-ffmpeg';
 import shuffle from 'array-shuffle';
@@ -21,7 +21,6 @@ import debug from '../utils/debug.js';
 import {getGuildSettings} from '../utils/get-guild-settings.js';
 import {buildPlayingMessageEmbed} from '../utils/build-embed.js';
 import Config from './config.js';
-import {promises as fs} from 'fs';
 import ThirdParty from './third-party.js';
 import Soundcloud from 'soundcloud.ts';
 
@@ -63,8 +62,6 @@ export interface PlayerEvents {
   statusChange: (oldStatus: STATUS, newStatus: STATUS) => void;
 }
 
-type YTDLVideoFormat = videoFormat & {loudnessDb?: number};
-
 export const DEFAULT_VOLUME = 100;
 
 export default class {
@@ -83,13 +80,15 @@ export default class {
   private nowPlaying: QueuedSong | null = null;
   private playPositionInterval: NodeJS.Timeout | undefined;
   private lastSongURL = '';
+  private type: StreamType | undefined;
+  private loudness: number | undefined;
 
   private positionInSeconds = 0;
   private readonly fileCache: FileCacheProvider;
   private readonly soundcloud: Soundcloud;
   private disconnectTimer: NodeJS.Timeout | null = null;
 
-  constructor(thirdParty: ThirdParty, fileCache: FileCacheProvider, guildId: string, private readonly config: Config) {
+  constructor(thirdParty: ThirdParty, fileCache: FileCacheProvider, guildId: string) {
     this.soundcloud = thirdParty.soundcloud;
     this.fileCache = fileCache;
     this.guildId = guildId;
@@ -462,41 +461,38 @@ export default class {
     const ffmpegInputOptions: string[] = [];
     let shouldCacheVideo = false;
 
-    let format: YTDLVideoFormat | undefined;
+    let format: InfoData['format'][0] | undefined;
 
     ffmpegInput = await this.fileCache.getPathFor(this.getHashForCache(song.url));
 
     if (!ffmpegInput) {
-      let agent: ytdl.Agent | undefined;
-      if (this.config.YOUTUBE_COOKIE_JSON_PATH) {
-        try {
-          const cookies = await fs.readFile(this.config.YOUTUBE_COOKIE_JSON_PATH, 'utf8');
-          agent = ytdl.createAgent(JSON.parse(cookies));
-        } catch (e) {
-          console.error('Failed to load cookies', e);
-          agent = undefined;
+      // Not yet cached, must download
+      const info = await video_info(song.url);
+
+      // Don't cache livestreams or long videos
+      const MAX_CACHE_LENGTH_SECONDS = 30 * 60; // 30 minutes
+      shouldCacheVideo = !info.video_details.live && info.video_details.durationInSec < MAX_CACHE_LENGTH_SECONDS && !options.seek;
+
+      if (!shouldCacheVideo) {
+        const stream = await stream_from_info(info, {seek: options.seek});
+        debug('Not caching video');
+        debug('Spawned play-dl stream');
+        if (!info.video_details.live) {
+          this.loudness = info.format[info.format.length - 1].loudnessDb;
+          this.loudness = this.loudness ? 2 ** (-this.loudness / 10) : 1;
+          debug('Loudness:', this.loudness);
         }
+
+        debug('Audio format:', stream.type);
+        this.type = stream.type;
+
+        return stream.stream;
       }
 
-      // Not yet cached, must download
-      const info = await ytdl.getInfo(song.url, {agent});
+      format = info.format.at(info.format.length - 1);
 
-      const formats = info.formats as YTDLVideoFormat[];
-
-      const filter = (format: ytdl.videoFormat): boolean => format.codecs === 'opus' && format.container === 'webm' && format.audioSampleRate !== undefined && parseInt(format.audioSampleRate, 10) === 48000;
-
-      format = formats.find(filter);
-
-      debug(info, formats, format);
-
-      const nextBestFormat = (formats: ytdl.videoFormat[]): ytdl.videoFormat | undefined => {
-        if (formats[0].isLive) {
-          formats = formats.sort((a, b) => (b as unknown as {audioBitrate: number}).audioBitrate - (a as unknown as {audioBitrate: number}).audioBitrate); // Bad typings
-
-          return formats.find(format => [128, 127, 120, 96, 95, 94, 93].includes(parseInt(format.itag as unknown as string, 10))); // Bad typings
-        }
-
-        formats = formats
+      if (format?.mimeType?.slice(0, 5) !== 'audio') { // Legacy video
+        const formats = info.format
           .filter(format => format.averageBitrate)
           .sort((a, b) => {
             if (a && b) {
@@ -505,25 +501,17 @@ export default class {
 
             return 0;
           });
-        return formats.find(format => !format.bitrate) ?? formats[0];
-      };
+
+        format = formats.find(format => !format.bitrate) ?? formats[0];
+      }
 
       if (!format) {
-        format = nextBestFormat(info.formats);
-
-        if (!format) {
-          // If still no format is found, throw
-          throw new Error('Can\'t find suitable format.');
-        }
+        // If no format is found, throw
+        throw new Error('Can\'t find suitable format.');
       }
 
       debug('Using format', format);
-
-      ffmpegInput = format.url;
-
-      // Don't cache livestreams or long videos
-      const MAX_CACHE_LENGTH_SECONDS = 30 * 60; // 30 minutes
-      shouldCacheVideo = !info.player_response.videoDetails.isLiveContent && parseInt(info.videoDetails.lengthSeconds, 10) < MAX_CACHE_LENGTH_SECONDS && !options.seek;
+      ffmpegInput = format.url!;
 
       debug(shouldCacheVideo ? 'Caching video' : 'Not caching video');
 
@@ -667,7 +655,7 @@ export default class {
 
   private createAudioStream(stream: Readable) {
     return createAudioResource(stream, {
-      inputType: StreamType.WebmOpus,
+      inputType: this.type ?? StreamType.WebmOpus,
       inlineVolume: true,
     });
   }
@@ -682,6 +670,7 @@ export default class {
 
   private setAudioPlayerVolume(level?: number) {
     // Audio resource expects a float between 0 and 1 to represent level percentage
-    this.audioResource?.volume?.setVolume((level ?? this.getVolume()) / 100);
+    this.loudness = this.loudness ?? 1;
+    this.audioResource?.volume?.setVolume((level ? level * this.loudness : (this.getVolume()) / 100) * this.loudness);
   }
 }

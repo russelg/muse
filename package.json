@@ -119,6 +119,7 @@
     "pagination.djs": "^4.0.10",
     "parse-duration": "1.0.2",
     "patch-package": "^8.0.0",
+    "play-dl": "^1.9.7",
     "postinstall-postinstall": "^2.1.0",
     "read-pkg": "7.1.0",
     "reflect-metadata": "^0.1.13",
