@@ -20,8 +20,10 @@ import FileCacheProvider from './file-cache.js';
 import debug from '../utils/debug.js';
 import {getGuildSettings} from '../utils/get-guild-settings.js';
 import {buildPlayingMessageEmbed} from '../utils/build-embed.js';
-import Config from './config';
+import Config from './config.js';
 import {promises as fs} from 'fs';
+import ThirdParty from './third-party.js';
+import Soundcloud from 'soundcloud.ts';
 
 export enum MediaSource {
   Youtube,
@@ -38,7 +40,6 @@ export interface SongMetadata {
   title: string;
   artist: string;
   url: string;
-  originalUrl: string | null;
   length: number;
   offset: number;
   playlist: QueuedPlaylist | null;
@@ -85,9 +86,11 @@ export default class {
 
   private positionInSeconds = 0;
   private readonly fileCache: FileCacheProvider;
+  private readonly soundcloud: Soundcloud;
   private disconnectTimer: NodeJS.Timeout | null = null;
 
-  constructor(fileCache: FileCacheProvider, guildId: string, private readonly config: Config) {
+  constructor(thirdParty: ThirdParty, fileCache: FileCacheProvider, guildId: string, private readonly config: Config) {
+    this.soundcloud = thirdParty.soundcloud;
     this.fileCache = fileCache;
     this.guildId = guildId;
   }
@@ -451,7 +454,8 @@ export default class {
     }
 
     if (song.source === MediaSource.SoundCloud) {
-      return this.createReadStream({url: song.url, cacheKey: song.originalUrl ?? song.url});
+      const scSong = await this.soundcloud.util.streamTrack(song.url) as Readable;
+      return this.createReadStream({url: scSong, cacheKey: song.url});
     }
 
     let ffmpegInput: string | null;
@@ -623,7 +627,7 @@ export default class {
     }
   }
 
-  private async createReadStream(options: {url: string; cacheKey: string; ffmpegInputOptions?: string[]; cache?: boolean; volumeAdjustment?: string}): Promise<Readable> {
+  private async createReadStream(options: {url: string | Readable; cacheKey: string; ffmpegInputOptions?: string[]; cache?: boolean; volumeAdjustment?: string}): Promise<Readable> {
     return new Promise((resolve, reject) => {
       const capacitor = new WriteStream();
 

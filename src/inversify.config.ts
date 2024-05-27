@@ -65,7 +65,7 @@ container.bind<GetSongs>(TYPES.Services.GetSongs).to(GetSongs).inSingletonScope(
 container.bind<AddQueryToQueue>(TYPES.Services.AddQueryToQueue).to(AddQueryToQueue).inSingletonScope();
 container.bind<YoutubeAPI>(TYPES.Services.YoutubeAPI).to(YoutubeAPI).inSingletonScope();
 container.bind<SpotifyAPI>(TYPES.Services.SpotifyAPI).to(SpotifyAPI).inSingletonScope();
-container.bind<SoundcloudAPI>(TYPES.Services.SoundcloudAPI).to(SoundcloudAPI).inSingletonScope();
+container.bind<SoundcloudAPI>(TYPES.Services.SoundCloudAPI).to(SoundcloudAPI).inSingletonScope();
 
 // Commands
 [

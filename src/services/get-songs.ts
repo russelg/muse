@@ -13,7 +13,7 @@ export default class {
   private readonly spotifyAPI: SpotifyAPI;
   private readonly soundcloudAPI: SoundcloudAPI;
 
-  constructor(@inject(TYPES.Services.YoutubeAPI) youtubeAPI: YoutubeAPI, @inject(TYPES.Services.SpotifyAPI) spotifyAPI: SpotifyAPI, @inject(TYPES.Services.SoundcloudAPI) soundcloudAPI: SoundcloudAPI) {
+  constructor(@inject(TYPES.Services.YoutubeAPI) youtubeAPI: YoutubeAPI, @inject(TYPES.Services.SpotifyAPI) spotifyAPI: SpotifyAPI, @inject(TYPES.Services.SoundCloudAPI) soundcloudAPI: SoundcloudAPI) {
     this.youtubeAPI = youtubeAPI;
     this.spotifyAPI = spotifyAPI;
     this.soundcloudAPI = soundcloudAPI;
@@ -29,6 +29,22 @@ export default class {
 
   async youtubePlaylist(listId: string, shouldSplitChapters: boolean): Promise<SongMetadata[]> {
     return this.youtubeAPI.getPlaylist(listId, shouldSplitChapters);
+  }
+
+  async soundcloudVideoSearch(query: string): Promise<SongMetadata[]> {
+    return this.soundcloudAPI.search(query);
+  }
+
+  async soundcloudVideo(url: string): Promise<SongMetadata[]> {
+    return this.soundcloudAPI.get(url);
+  }
+
+  async soundcloudPlaylist(listId: string): Promise<SongMetadata[]> {
+    return this.soundcloudAPI.getPlaylist(listId);
+  }
+
+  async soundcloudArtist(listId: string): Promise<SongMetadata[]> {
+    return this.soundcloudAPI.getArtist(listId);
   }
 
   async spotifySource(url: string, playlistLimit: number, shouldSplitChapters: boolean): Promise<[SongMetadata[], number, number]> {
@@ -61,15 +77,6 @@ export default class {
     }
   }
 
-  async soundcloud(url: string): Promise<SongMetadata> {
-    return this.soundcloudAPI.getSong(url);
-  }
-
-  async soundcloudPlaylist(url: string): Promise<SongMetadata[]> {
-    const songs = await this.soundcloudAPI.getPlaylist(url);
-    return songs.filter(song => Boolean(song)) as SongMetadata[];
-  }
-
   async httpLiveStream(url: string): Promise<SongMetadata> {
     return new Promise((resolve, reject) => {
       ffmpeg(url).ffprobe((err, _) => {
@@ -79,7 +86,6 @@ export default class {
 
         resolve({
           url,
-          originalUrl: url,
           source: MediaSource.HLS,
           isLive: true,
           title: url,
