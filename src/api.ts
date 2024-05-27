@@ -106,9 +106,4 @@ export default class {
       console.log(`⚡️[server]: Server is running at http://localhost:${this.config.WEBSERVER_PORT}`);
     });
   }
-
-  private async _getPlayingForGuildId(guildId: string): Promise<QueuedSong | null> {
-    const player = this.playerManager.get(guildId);
-    return player.getCurrent();
-  }
 }
