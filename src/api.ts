@@ -6,6 +6,7 @@ import {prettyTime} from './utils/time.js';
 import {MediaSource, QueuedSong, STATUS} from './services/player.js';
 import getYouTubeID from 'get-youtube-id';
 import Config from './services/config.js';
+import AddQueryToQueue from './services/add-query-to-queue.js';
 
 const transformSong = (song: QueuedSong, index?: number) => {
   const info = getSongTitleInfo(song);
@@ -50,6 +51,7 @@ export default class {
   constructor(
     @inject(TYPES.Managers.Player) private readonly playerManager: PlayerManager,
     @inject(TYPES.Config) private readonly config: Config,
+    @inject(TYPES.Services.AddQueryToQueue) private readonly addQueryToQueue: AddQueryToQueue,
   ) {
     this.app.get('/np/:guildId', async (req, res) => {
       try {
@@ -97,6 +99,35 @@ export default class {
         res.send(response);
       } catch (e) {
         res.send({success: false, error: e});
+      }
+    });
+
+    this.app.post('/play/:guildId/:password', express.json({type: '*/*'}), async (req, res) => {
+      try {
+        const {guildId, password} = req.params;
+
+        if (this.config.WEBSERVER_PASSWORD !== password) {
+          throw new Error('Unauthorized');
+        }
+
+        const body = req.body as Partial<{query: string; immediate: boolean}>;
+        if (!body.query) {
+          throw new Error('No query given');
+        }
+
+        const message = await this.addQueryToQueue.addToQueueInternal({
+          guildId,
+          query: body.query,
+          addToFrontOfQueue: body.immediate ?? false,
+          shuffleAdditions: false,
+          shouldSplitChapters: false,
+        });
+
+        res.send({success: true, message});
+      } catch (e: any) {
+        console.error(e);
+        const error = e instanceof Error ? e.message : e as string;
+        res.send({success: false, error});
       }
     });
   }

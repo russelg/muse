@@ -15,6 +15,7 @@ const CONFIG_MAP = {
   SPOTIFY_CLIENT_ID: process.env.SPOTIFY_CLIENT_ID,
   SPOTIFY_CLIENT_SECRET: process.env.SPOTIFY_CLIENT_SECRET,
   WEBSERVER_PORT: process.env.WEBSERVER_PORT ?? 80,
+  WEBSERVER_PASSWORD: process.env.WEBSERVER_PASSWORD ?? '',
   REGISTER_COMMANDS_ON_BOT: process.env.REGISTER_COMMANDS_ON_BOT === 'true',
   DATA_DIR,
   CACHE_DIR: path.join(DATA_DIR, 'cache'),
@@ -38,6 +39,7 @@ const BOT_ACTIVITY_TYPE_MAP = {
 export default class Config {
   readonly DISCORD_TOKEN!: string;
   readonly WEBSERVER_PORT!: number;
+  readonly WEBSERVER_PASSWORD!: string;
   readonly YOUTUBE_API_KEY!: string;
   readonly SPOTIFY_CLIENT_ID!: string;
   readonly SPOTIFY_CLIENT_SECRET!: string;

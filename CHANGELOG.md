@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Added API for adding songs to the queue
+
+### Fixed
+- Fixed wrong node version for CI
+
 ## [2.8.2] - 2024-05-27
 
 ### Added
