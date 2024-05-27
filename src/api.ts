@@ -5,7 +5,7 @@ import express from 'express';
 import {prettyTime} from './utils/time.js';
 import {MediaSource, QueuedSong, STATUS} from './services/player.js';
 import getYouTubeID from 'get-youtube-id';
-import Config from './services/config';
+import Config from './services/config.js';
 
 const transformSong = (song: QueuedSong, index?: number) => {
   const info = getSongTitleInfo(song);

@@ -14,6 +14,7 @@ import AddQueryToQueue from './services/add-query-to-queue.js';
 import GetSongs from './services/get-songs.js';
 import YoutubeAPI from './services/youtube-api.js';
 import SpotifyAPI from './services/spotify-api.js';
+import SoundcloudAPI from './services/soundcloud-api.js';
 
 // Commands
 import Command from './commands/index.js';
@@ -42,7 +43,6 @@ import Volume from './commands/volume.js';
 import ThirdParty from './services/third-party.js';
 import FileCacheProvider from './services/file-cache.js';
 import KeyValueCacheProvider from './services/key-value-cache.js';
-import SoundcloudAPI from './services/soundcloud-api';
 
 const container = new Container();
 
