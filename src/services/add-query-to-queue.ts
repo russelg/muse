@@ -43,6 +43,7 @@ export default class AddQueryToQueue {
     guildId,
     targetVoiceChannel,
     interaction,
+    username,
   }: {
     query: string;
     addToFrontOfQueue: boolean;
@@ -51,14 +52,21 @@ export default class AddQueryToQueue {
     guildId: string;
     targetVoiceChannel?: VoiceChannel;
     interaction?: ChatInputCommandInteraction;
+    username?: string;
   }) {
     const player = this.playerManager.get(guildId);
     const wasPlayingSong = player.getCurrent() !== null;
 
     const guild = this.client.guilds.cache.get(guildId);
+    const botMember = this.client.user
+      ? await guild?.members.fetch(this.client.user)
+      : undefined;
+    const member = interaction
+      ? interaction?.member as GuildMember
+      : botMember;
 
     if (!targetVoiceChannel) {
-      targetVoiceChannel = (getMemberVoiceChannel(interaction?.member as GuildMember) ?? getMostPopularVoiceChannel(guild!) ?? [])[0];
+      targetVoiceChannel = getMemberVoiceChannel(member)?.[0] ?? getMostPopularVoiceChannel(guild!)?.[0] ?? null;
     }
 
     const settings = await getGuildSettings(guildId);
@@ -163,15 +171,14 @@ export default class AddQueryToQueue {
       newSongs = await Promise.all(newSongs.map(this.skipNonMusicSegments.bind(this)));
     }
 
-    const member = interaction?.member
-      ?? this.client.user ? await guild?.members.fetch(this.client.user!) : undefined;
-    const requestedByName = member?.nickname ?? member?.user.username ?? 'fartbot';
-
+    const botName = this.config.BOT_NAME;
+    const memberUsername = member?.nickname ?? member?.user.username ?? botName;
+    const requestedByName = username ?? memberUsername;
     newSongs.forEach(song => {
       player.add({
         ...song,
-        addedInChannelId: interaction?.channel!.id ?? 'fartbot',
-        requestedBy: member?.user.id ?? this.client.user!.id,
+        addedInChannelId: interaction?.channel?.id ?? targetVoiceChannel?.id ?? botName,
+        requestedBy: username ?? member?.user.id ?? botName,
         requestedByName,
       }, {immediate: addToFrontOfQueue ?? false});
     });

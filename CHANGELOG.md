@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Username can be provided for API queue requests
+
+### Fixed
+- Fixed incorrect name being shown for discord queued song
+
 ## [2.8.5] - 2024-05-27
 
 ### Fixed

@@ -65,12 +65,10 @@ export default class {
 
         const queuePosition = player.getQueuePosition();
         const queue = fullQueue
-          .slice(0, 50)
-          .map((song, i) => transformSong(song, queuePosition + i + 1));
+          .map((song, i) => transformSong(song, i + 1));
         const queueHistory = history
-          .slice(0, 50)
-          .reverse()
-          .map((song, i) => transformSong(song, queuePosition - i - 1));
+          .map((song, i) => transformSong(song, i + 1))
+          .reverse();
 
         const current = player.getCurrent();
         const nowPlaying = current ? transformSong(current) : null;
@@ -110,7 +108,7 @@ export default class {
           throw new Error('Unauthorized');
         }
 
-        const body = req.body as Partial<{query: string; immediate: boolean}>;
+        const body = req.body as Partial<{query: string; immediate: boolean; username: string}>;
         if (!body.query) {
           throw new Error('No query given');
         }
@@ -121,6 +119,7 @@ export default class {
           addToFrontOfQueue: body.immediate ?? false,
           shuffleAdditions: false,
           shouldSplitChapters: false,
+          username: body.username,
         });
 
         res.send({success: true, message});
