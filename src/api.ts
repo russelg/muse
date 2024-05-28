@@ -7,6 +7,7 @@ import {MediaSource, QueuedSong, STATUS} from './services/player.js';
 import getYouTubeID from 'get-youtube-id';
 import Config from './services/config.js';
 import AddQueryToQueue from './services/add-query-to-queue.js';
+import debug from './utils/debug.js';
 
 const transformSong = (song: QueuedSong, index?: number) => {
   const info = getSongTitleInfo(song);
@@ -96,6 +97,7 @@ export default class {
 
         res.send(response);
       } catch (e) {
+        debug(e);
         res.send({success: false, error: e});
       }
     });
@@ -124,7 +126,30 @@ export default class {
 
         res.send({success: true, message});
       } catch (e: any) {
-        console.error(e);
+        debug(e);
+        const error = e instanceof Error ? e.message : e as string;
+        res.send({success: false, error});
+      }
+    });
+
+    this.app.post('/skip/:guildId/:password', async (req, res) => {
+      try {
+        const {guildId, password} = req.params;
+
+        if (this.config.WEBSERVER_PASSWORD !== password) {
+          throw new Error('Unauthorized');
+        }
+
+        const player = this.playerManager.get(guildId);
+        try {
+          await player.forward(1);
+        } catch (_: unknown) {
+          throw new Error('no song to skip to');
+        }
+
+        res.send({success: true, message: 'keep \'er movin\''});
+      } catch (e: any) {
+        debug(e);
         const error = e instanceof Error ? e.message : e as string;
         res.send({success: false, error});
       }
