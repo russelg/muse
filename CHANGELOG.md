@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.9.0] - 2024-05-28
+
 ### Added
 - Add `/skip` endpoint
 - Username can be provided for API queue requests
@@ -339,7 +341,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial release
 
-[unreleased]: https://github.com/russelg/muse/compare/v2.8.5...HEAD
+[unreleased]: https://github.com/russelg/muse/compare/v2.9.0...HEAD
+[2.9.0]: https://github.com/russelg/muse/compare/v2.8.5...v2.9.0
 [2.8.5]: https://github.com/russelg/muse/compare/v2.8.4...v2.8.5
 [2.8.4]: https://github.com/russelg/muse/compare/v2.8.3...v2.8.4
 [2.8.3]: https://github.com/russelg/muse/compare/v2.8.2...v2.8.3
