@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.9.1] - 2024-06-25
+
 ### Fixed
 - Disabled volume command because shit is mega broken
 - Switched to iOS client as a workaround (see: https://github.com/play-dl/play-dl/issues/370)
@@ -345,7 +347,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial release
 
-[unreleased]: https://github.com/russelg/muse/compare/v2.9.0...HEAD
+[unreleased]: https://github.com/russelg/muse/compare/v2.9.1...HEAD
+[2.9.1]: https://github.com/russelg/muse/compare/v2.9.0...v2.9.1
 [2.9.0]: https://github.com/russelg/muse/compare/v2.8.5...v2.9.0
 [2.8.5]: https://github.com/russelg/muse/compare/v2.8.4...v2.8.5
 [2.8.4]: https://github.com/russelg/muse/compare/v2.8.3...v2.8.4
