@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Disabled volume command because shit is mega broken
 - Switched to iOS client as a workaround (see: https://github.com/play-dl/play-dl/issues/370)
 
 ## [2.9.0] - 2024-05-28

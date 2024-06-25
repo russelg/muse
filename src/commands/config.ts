@@ -48,15 +48,6 @@ export default class implements Command {
         .setDescription('whether to announce the next song in the queue automatically')
         .setRequired(true)))
     .addSubcommand(subcommand => subcommand
-      .setName('set-default-volume')
-      .setDescription('set default volume used when entering the voice channel')
-      .addIntegerOption(option => option
-        .setName('level')
-        .setDescription('volume percentage (0 is muted, 100 is max & default)')
-        .setMinValue(0)
-        .setMaxValue(100)
-        .setRequired(true)))
-    .addSubcommand(subcommand => subcommand
       .setName('get')
       .setDescription('show all settings'));
 
@@ -150,23 +141,6 @@ export default class implements Command {
         });
 
         await interaction.reply('👍 auto announce setting updated');
-
-        break;
-      }
-
-      case 'set-default-volume': {
-        const value = interaction.options.getInteger('level')!;
-
-        await prisma.setting.update({
-          where: {
-            guildId: interaction.guild!.id,
-          },
-          data: {
-            defaultVolume: value,
-          },
-        });
-
-        await interaction.reply('👍 volume setting updated');
 
         break;
       }
