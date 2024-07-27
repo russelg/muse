@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.10.0] - 2024-07-27
+
 ### Fixed
 - Added `/reset-volume` to attempt to reset the volume if normalization is screwed up.
 - Always check for the audio loudness level from the API, even if the file is cached.
@@ -351,7 +353,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial release
 
-[unreleased]: https://github.com/russelg/muse/compare/v2.9.1...HEAD
+[unreleased]: https://github.com/russelg/muse/compare/v2.10.0...HEAD
+[2.10.0]: https://github.com/russelg/muse/compare/v2.9.1...v2.10.0
 [2.9.1]: https://github.com/russelg/muse/compare/v2.9.0...v2.9.1
 [2.9.0]: https://github.com/russelg/muse/compare/v2.8.5...v2.9.0
 [2.8.5]: https://github.com/russelg/muse/compare/v2.8.4...v2.8.5
