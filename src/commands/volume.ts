@@ -8,17 +8,10 @@ import {SlashCommandBuilder} from '@discordjs/builders';
 @injectable()
 export default class implements Command {
   public readonly slashCommand = new SlashCommandBuilder()
-    .setName('volume')
-    .setDescription('set current player volume level')
-    .addIntegerOption(option =>
-      option.setName('level')
-        .setDescription('volume percentage (0 is muted, 100 is max & default)')
-        .setMinValue(0)
-        .setMaxValue(100)
-        .setRequired(true),
-    );
+    .setName('reset-volume')
+    .setDescription('reset player volume if its fucked up. note this may make things worse');
 
-  public requiresVC = true;
+  public requiresVC = false;
 
   private readonly playerManager: PlayerManager;
 
@@ -35,8 +28,7 @@ export default class implements Command {
       throw new Error('nothing is playing');
     }
 
-    const level = interaction.options.getInteger('level') ?? 100;
-    player.setVolume(level);
-    await interaction.reply(`Set volume to ${level}%`);
+    player.resetVolume();
+    await interaction.reply('reset the volume to default');
   }
 }

@@ -431,10 +431,10 @@ export default class {
     return this.queue[this.queuePosition + to];
   }
 
-  setVolume(level: number): void {
-    // Level should be a number between 0 and 100 = 0% => 100%
-    this.volume = level;
-    this.setAudioPlayerVolume(level);
+  resetVolume() {
+    this.volume = this.defaultVolume;
+    this.loudness = 0.1;
+    this.setAudioPlayerVolume(this.volume);
   }
 
   getVolume(): number {
@@ -476,12 +476,6 @@ export default class {
         const stream = await stream_from_info(info, {seek: options.seek});
         debug('Not caching video');
         debug('Spawned play-dl stream');
-        if (!info.video_details.live) {
-          this.loudness = info.format[info.format.length - 1].loudnessDb;
-          this.loudness = this.loudness ? 2 ** (-this.loudness / 10) : 1;
-          debug('Loudness:', this.loudness);
-        }
-
         debug('Audio format:', stream.type);
         this.type = stream.type;
 

@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Added `/reset-volume` to attempt to reset the volume if normalization is screwed up.
+
 ## [2.9.1] - 2024-06-25
 
 ### Fixed

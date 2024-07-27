@@ -42,6 +42,7 @@ import Unskip from './commands/unskip.js';
 import ThirdParty from './services/third-party.js';
 import FileCacheProvider from './services/file-cache.js';
 import KeyValueCacheProvider from './services/key-value-cache.js';
+import Volume from './commands/volume.js';
 
 const container = new Container();
 
@@ -89,6 +90,7 @@ container.bind<SoundcloudAPI>(TYPES.Services.SoundCloudAPI).to(SoundcloudAPI).in
   Skip,
   Stop,
   Unskip,
+  Volume,
 ].forEach(command => {
   container.bind<Command>(TYPES.Command).to(command).inSingletonScope();
 });
