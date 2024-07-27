@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Added `/reset-volume` to attempt to reset the volume if normalization is screwed up.
+- Always check for the audio loudness level from the API, even if the file is cached.
 
 ## [2.9.1] - 2024-06-25
 

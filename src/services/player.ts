@@ -464,6 +464,19 @@ export default class {
 
     ffmpegInput = await this.fileCache.getPathFor(this.getHashForCache(song.url));
 
+    // Not yet cached, must download
+    const info = await video_info(song.url);
+
+    // Set loudness for video regardless of cache or not.
+    // don't want to get earsexed
+    if (!info.video_details.live) {
+      const streamLoudness = info.format[info.format.length - 1].loudnessDb;
+      this.loudness = streamLoudness;
+      this.loudness = this.loudness ? 2 ** (-this.loudness / 10) : 1;
+      debug('Stream Loudness:', streamLoudness);
+      debug('Loudness:', this.loudness);
+    }
+
     if (!ffmpegInput) {
       // Not yet cached, must download
       const info = await video_info(song.url);
