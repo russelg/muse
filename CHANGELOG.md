@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Add `/kill` command
+
 ## [2.10.0] - 2024-07-27
 
 ### Fixed

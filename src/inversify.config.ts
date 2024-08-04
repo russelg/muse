@@ -22,9 +22,12 @@ import Clear from './commands/clear.js';
 import Config from './commands/config.js';
 import Disconnect from './commands/disconnect.js';
 import Favorites from './commands/favorites.js';
+import FileCacheProvider from './services/file-cache.js';
 import ForwardSeek from './commands/fseek.js';
-import LoopQueue from './commands/loop-queue.js';
+import KeyValueCacheProvider from './services/key-value-cache.js';
+import Kill from './commands/kill.js';
 import Loop from './commands/loop.js';
+import LoopQueue from './commands/loop-queue.js';
 import Move from './commands/move.js';
 import Next from './commands/next.js';
 import NowPlaying from './commands/now-playing.js';
@@ -38,10 +41,8 @@ import Seek from './commands/seek.js';
 import Shuffle from './commands/shuffle.js';
 import Skip from './commands/skip.js';
 import Stop from './commands/stop.js';
-import Unskip from './commands/unskip.js';
 import ThirdParty from './services/third-party.js';
-import FileCacheProvider from './services/file-cache.js';
-import KeyValueCacheProvider from './services/key-value-cache.js';
+import Unskip from './commands/unskip.js';
 import Volume from './commands/volume.js';
 
 const container = new Container();
@@ -74,8 +75,9 @@ container.bind<SoundcloudAPI>(TYPES.Services.SoundCloudAPI).to(SoundcloudAPI).in
   Disconnect,
   Favorites,
   ForwardSeek,
-  LoopQueue,
+  Kill,
   Loop,
+  LoopQueue,
   Move,
   Next,
   NowPlaying,
