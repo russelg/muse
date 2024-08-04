@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.10.1] - 2024-08-04
+
 ### Added
 - Add `/kill` command
 
@@ -356,7 +358,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial release
 
-[unreleased]: https://github.com/russelg/muse/compare/v2.10.0...HEAD
+[unreleased]: https://github.com/russelg/muse/compare/v2.10.1...HEAD
+[2.10.1]: https://github.com/russelg/muse/compare/v2.10.0...v2.10.1
 [2.10.0]: https://github.com/russelg/muse/compare/v2.9.1...v2.10.0
 [2.9.1]: https://github.com/russelg/muse/compare/v2.9.0...v2.9.1
 [2.9.0]: https://github.com/russelg/muse/compare/v2.8.5...v2.9.0
