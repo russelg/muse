@@ -55,7 +55,7 @@ jobs:
         with:
           push: true
           tags: |
-            russelg/muse:${{ github.sha }}-${{ matrix.tagged-platform }}
+            russelgazimov/muse:${{ github.sha }}-${{ matrix.tagged-platform }}
             ${{ env.REGISTRY_IMAGE }}:${{ github.sha }}-${{ matrix.tagged-platform }}
           platforms: ${{ matrix.build-arch }}
           build-args: |
@@ -103,7 +103,7 @@ jobs:
           docker_image: ${{ env.REGISTRY_IMAGE }}
 
       - name: Combine tags (Docker Hub)
-        run: docker buildx imagetools create $(echo '${{ steps.get-tags-dockerhub.outputs.tag }}' | tr "," "\0" | xargs -0 printf -- '-t %s ') 'codetheweb/muse:${{ github.sha }}-arm64' 'codetheweb/muse:${{ github.sha }}-amd64'
+        run: docker buildx imagetools create $(echo '${{ steps.get-tags-dockerhub.outputs.tag }}' | tr "," "\0" | xargs -0 printf -- '-t %s ') 'russelgazimov/muse:${{ github.sha }}-arm64' 'russelgazimov/muse:${{ github.sha }}-amd64'
 
       - name: Combine tags (GitHub Container Registry)
         run: docker buildx imagetools create $(echo '${{ steps.get-tags-ghcr.outputs.tag }}' | tr "," "\0" | xargs -0 printf -- '-t %s ') '${{ env.REGISTRY_IMAGE }}:${{ github.sha }}-arm64' '${{ env.REGISTRY_IMAGE }}:${{ github.sha }}-amd64'
