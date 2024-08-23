@@ -132,7 +132,7 @@ export default class {
 
       this.loopCurrentSong = false;
       this.voiceConnection.destroy();
-      this.audioPlayer?.stop();
+      this.audioPlayer?.stop(true);
 
       this.voiceConnection = null;
       this.audioPlayer = null;
@@ -286,8 +286,8 @@ export default class {
       if (this.getCurrent() && this.status !== STATUS.PAUSED) {
         await this.play();
       } else {
-        this.audioPlayer?.stop();
         this.status = STATUS.IDLE;
+        this.audioPlayer?.stop(true);
 
         const settings = await getGuildSettings(this.guildId);
 
@@ -447,6 +447,12 @@ export default class {
   }
 
   private async getStream(song: QueuedSong, options: {seek?: number; to?: number} = {}): Promise<Readable> {
+    if (this.status === STATUS.PLAYING) {
+      this.audioPlayer?.stop();
+    } else if (this.status === STATUS.PAUSED) {
+      this.audioPlayer?.stop(true);
+    }
+
     if (song.source === MediaSource.HLS) {
       return this.createReadStream({url: song.url, cacheKey: song.url});
     }
@@ -651,7 +657,10 @@ export default class {
       stream.pipe(capacitor);
 
       returnedStream.on('close', () => {
-        stream.kill('SIGKILL');
+        if (!options.cache) {
+          stream.kill('SIGKILL');
+        }
+
         hasReturnedStreamClosed = true;
       });
 

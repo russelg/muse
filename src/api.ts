@@ -110,7 +110,7 @@ export default class {
           throw new Error('Unauthorized');
         }
 
-        const body = req.body as Partial<{query: string; immediate: boolean; username: string}>;
+        const body = req.body as Partial<{query: string; immediate: boolean; skipCurrentTrack: boolean; username: string}>;
         if (!body.query) {
           throw new Error('No query given');
         }
@@ -121,6 +121,7 @@ export default class {
           addToFrontOfQueue: body.immediate ?? false,
           shuffleAdditions: false,
           shouldSplitChapters: false,
+          skipCurrentTrack: body.skipCurrentTrack ?? false,
           username: body.username,
         });
 

@@ -40,6 +40,7 @@ export default class AddQueryToQueue {
     addToFrontOfQueue,
     shuffleAdditions,
     shouldSplitChapters,
+    skipCurrentTrack,
     guildId,
     targetVoiceChannel,
     interaction,
@@ -49,11 +50,12 @@ export default class AddQueryToQueue {
     addToFrontOfQueue: boolean;
     shuffleAdditions: boolean;
     shouldSplitChapters: boolean;
+    skipCurrentTrack: boolean;
     guildId: string;
     targetVoiceChannel?: VoiceChannel;
     interaction?: ChatInputCommandInteraction;
     username?: string;
-  }) {
+  }): Promise<string> {
     const player = this.playerManager.get(guildId);
     const wasPlayingSong = player.getCurrent() !== null;
 
@@ -211,6 +213,14 @@ export default class AddQueryToQueue {
       await player.play();
     }
 
+    if (skipCurrentTrack) {
+      try {
+        await player.forward(1);
+      } catch (_: unknown) {
+        throw new Error('no song to skip to');
+      }
+    }
+
     // Build response message
     if (statusMsg !== '') {
       if (extraMsg === '') {
@@ -246,12 +256,14 @@ export default class AddQueryToQueue {
     addToFrontOfQueue,
     shuffleAdditions,
     shouldSplitChapters,
+    skipCurrentTrack,
     interaction,
   }: {
     query: string;
     addToFrontOfQueue: boolean;
     shuffleAdditions: boolean;
     shouldSplitChapters: boolean;
+    skipCurrentTrack: boolean;
     interaction: ChatInputCommandInteraction;
   }) {
     return this.addToQueueInternal({
@@ -259,6 +271,7 @@ export default class AddQueryToQueue {
       addToFrontOfQueue,
       shuffleAdditions,
       shouldSplitChapters,
+      skipCurrentTrack,
       interaction,
       guildId: interaction.guild!.id,
     });

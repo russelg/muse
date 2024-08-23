@@ -9,7 +9,7 @@
   "types": "dts/types",
   "type": "module",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=18.17.0"
   },
   "files": [
     "src"
@@ -39,7 +39,7 @@
     "@types/fluent-ffmpeg": "^2.1.17",
     "@types/fs-capacitor": "^2.0.0",
     "@types/ms": "0.7.31",
-    "@types/node": "16",
+    "@types/node": "^17.0.0",
     "@types/node-emoji": "^1.8.1",
     "@types/spotify-web-api-node": "^5.0.2",
     "@types/validator": "^13.1.4",
@@ -89,7 +89,9 @@
     "@discordjs/builders": "1.1.0",
     "@discordjs/opus": "^0.8.0",
     "@discordjs/rest": "1.0.1",
-    "@discordjs/voice": "0.11.0",
+    "@discordjs/voice": "0.17.0",
+    "@distube/ytdl-core": "^4.14.4",
+    "@distube/ytsr": "^2.0.0",
     "@prisma/client": "4.16.0",
     "@types/libsodium-wrappers": "^0.7.9",
     "array-shuffle": "^3.0.0",
@@ -130,7 +132,6 @@
     "sync-fetch": "^0.3.1",
     "tsx": "3.8.2",
     "xbytes": "^1.7.0",
-    "ytdl-core": "^4.11.5",
     "ytsr": "^3.8.4"
   },
   "resolutions": {
