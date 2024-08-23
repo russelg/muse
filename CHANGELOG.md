@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Add `/unskip` endpoint
+- Add `skipCurrentTrack` to `/play` endpoint
+
+### Changed
+- Merged in upstream v2.9.3
+
 ## [2.10.1] - 2024-08-04
 
 ### Added

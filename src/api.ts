@@ -155,6 +155,29 @@ export default class {
         res.send({success: false, error});
       }
     });
+
+    this.app.post('/unskip/:guildId/:password', async (req, res) => {
+      try {
+        const {guildId, password} = req.params;
+
+        if (this.config.WEBSERVER_PASSWORD !== password) {
+          throw new Error('Unauthorized');
+        }
+
+        const player = this.playerManager.get(guildId);
+        try {
+          await player.back();
+        } catch (_: unknown) {
+          throw new Error('no song to go back to');
+        }
+
+        res.send({success: true, message: 'back \'er up\''});
+      } catch (e: any) {
+        debug(e);
+        const error = e instanceof Error ? e.message : e as string;
+        res.send({success: false, error});
+      }
+    });
   }
 
   public start() {
