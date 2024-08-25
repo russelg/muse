@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Add `CACHE_DURATION_LIMIT_SECONDS` environment variable (defaults to 30 * 60, 30 minutes.)
+
+### Fixed
+- Use ffmpeg for seeking instead of play-dl
+
 ## [2.11.0] - 2024-08-23
 
 ### Added

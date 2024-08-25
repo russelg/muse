@@ -22,6 +22,7 @@ import {getGuildSettings} from '../utils/get-guild-settings.js';
 import {buildPlayingMessageEmbed} from '../utils/build-embed.js';
 import ThirdParty from './third-party.js';
 import Soundcloud from 'soundcloud.ts';
+import Config from './config.js';
 
 export enum MediaSource {
   Youtube,
@@ -85,11 +86,13 @@ export default class {
   private positionInSeconds = 0;
   private readonly fileCache: FileCacheProvider;
   private readonly soundcloud: Soundcloud;
+  private readonly config: Config;
   private disconnectTimer: NodeJS.Timeout | null = null;
 
-  constructor(thirdParty: ThirdParty, fileCache: FileCacheProvider, guildId: string) {
+  constructor(thirdParty: ThirdParty, fileCache: FileCacheProvider, config: Config, guildId: string) {
     this.soundcloud = thirdParty.soundcloud;
     this.fileCache = fileCache;
+    this.config = config;
     this.guildId = guildId;
   }
 
@@ -487,12 +490,13 @@ export default class {
       // Not yet cached, must download
       const info = await video_info(song.url);
 
-      // Don't cache livestreams or long videos
-      const MAX_CACHE_LENGTH_SECONDS = 30 * 60; // 30 minutes
-      shouldCacheVideo = !info.video_details.live && info.video_details.durationInSec < MAX_CACHE_LENGTH_SECONDS && !options.seek;
+      // Don't cache livestreams or extra long videos
+      shouldCacheVideo = !info.video_details.live
+        && info.video_details.durationInSec < this.config.CACHE_DURATION_LIMIT_SECONDS;
 
-      if (!shouldCacheVideo) {
-        const stream = await stream_from_info(info, {seek: options.seek});
+      // Seeking doesn't seem to work with play-dl properly
+      if (!shouldCacheVideo && !options.seek) {
+        const stream = await stream_from_info(info);
         debug('Not caching video');
         debug('Spawned play-dl stream');
         debug('Audio format:', stream.type);
@@ -525,6 +529,7 @@ export default class {
       debug('Using format', format);
       ffmpegInput = format.url!;
 
+      shouldCacheVideo = shouldCacheVideo && !options.seek;
       debug(shouldCacheVideo ? 'Caching video' : 'Not caching video');
 
       ffmpegInputOptions.push(...[
