@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.12.0] - 2024-08-25
+
 ### Added
 - Add `CACHE_DURATION_LIMIT_SECONDS` environment variable (defaults to 30 * 60, 30 minutes.)
 
@@ -373,7 +375,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial release
 
-[unreleased]: https://github.com/russelg/muse/compare/v2.11.0...HEAD
+[unreleased]: https://github.com/russelg/muse/compare/v2.12.0...HEAD
+[2.12.0]: https://github.com/russelg/muse/compare/v2.11.0...v2.12.0
 [2.11.0]: https://github.com/russelg/muse/compare/v2.9.3...v2.11.0
 [2.10.1]: https://github.com/russelg/muse/compare/v2.10.0...v2.10.1
 [2.10.0]: https://github.com/russelg/muse/compare/v2.9.1...v2.10.0
