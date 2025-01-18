@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.13.3] - 2025-01-18
+
 ### Fixed
 - Attempt to fix formats being undefined
 
@@ -393,7 +395,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial release
 
-[unreleased]: https://github.com/russelg/muse/compare/v2.13.2...HEAD
+[unreleased]: https://github.com/russelg/muse/compare/v2.13.3...HEAD
+[2.13.3]: https://github.com/russelg/muse/compare/v2.13.2...v2.13.3
 [2.13.2]: https://github.com/russelg/muse/compare/v2.13.1...v2.13.2
 [2.13.1]: https://github.com/russelg/muse/compare/v2.13.0...v2.13.1
 [2.13.0]: https://github.com/russelg/muse/compare/v2.12.0...v2.13.0
