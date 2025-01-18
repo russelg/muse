@@ -464,10 +464,15 @@ export default class {
 
     if (!ffmpegInput) {
       // Not yet cached, must download
-      const info = await ytdl.getInfo(song.url, {playerClients: ['IOS', 'WEB_CREATOR']});
+      let info = await ytdl.getInfo(song.url, {playerClients: ['IOS', 'WEB_CREATOR']});
 
       if (info.formats.length === 0) {
-        throw new Error('no formats found for song... try another song or try again');
+        debug('Failed to find formats for song, trying again...');
+        info = await ytdl.getInfo(song.url, {playerClients: ['IOS', 'WEB_CREATOR']});
+
+        if (info.formats.length === 0) {
+          throw new Error('no formats found for song... try another song or try again');
+        }
       }
 
       const filter = (format: ytdl.videoFormat) => format.codecs === 'opus'

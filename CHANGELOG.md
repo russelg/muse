@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Try grab video info again if formats empty
+
 ## [2.13.4] - 2025-01-18
 
 ### Fixed
