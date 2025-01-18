@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Remove arm64 builds
+
 ## [2.13.1] - 2025-01-18
 
 ### Fixed

@@ -14,14 +14,10 @@ jobs:
       matrix:
         runner-platform:
           - ubuntu-latest
-          - namespace-profile-default-arm64
         include:
           - runner-platform: ubuntu-latest
             build-arch: linux/amd64
             tagged-platform: amd64
-          - runner-platform: namespace-profile-default-arm64
-            build-arch: linux/arm64
-            tagged-platform: arm64
     runs-on: ${{ matrix.runner-platform }}
     permissions:
       contents: read
@@ -103,10 +99,10 @@ jobs:
           docker_image: ${{ env.REGISTRY_IMAGE }}
 
       - name: Combine tags (Docker Hub)
-        run: docker buildx imagetools create $(echo '${{ steps.get-tags-dockerhub.outputs.tag }}' | tr "," "\0" | xargs -0 printf -- '-t %s ') 'russelgazimov/muse:${{ github.sha }}-arm64' 'russelgazimov/muse:${{ github.sha }}-amd64'
+        run: docker buildx imagetools create $(echo '${{ steps.get-tags-dockerhub.outputs.tag }}' | tr "," "\0" | xargs -0 printf -- '-t %s ') 'russelgazimov/muse:${{ github.sha }}-amd64'
 
       - name: Combine tags (GitHub Container Registry)
-        run: docker buildx imagetools create $(echo '${{ steps.get-tags-ghcr.outputs.tag }}' | tr "," "\0" | xargs -0 printf -- '-t %s ') '${{ env.REGISTRY_IMAGE }}:${{ github.sha }}-arm64' '${{ env.REGISTRY_IMAGE }}:${{ github.sha }}-amd64'
+        run: docker buildx imagetools create $(echo '${{ steps.get-tags-ghcr.outputs.tag }}' | tr "," "\0" | xargs -0 printf -- '-t %s ') '${{ env.REGISTRY_IMAGE }}:${{ github.sha }}-amd64'
 
       - name: Update Docker Hub description
         uses: peter-evans/dockerhub-description@v2.4.3
