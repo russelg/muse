@@ -1,16 +1,18 @@
-import {VoiceChannel, Snowflake} from 'discord.js';
+import {Snowflake, VoiceChannel} from 'discord.js';
 import {Readable} from 'stream';
 import hasha from 'hasha';
-import {InfoData, video_info, stream_from_info} from 'play-dl';
+import ytdl from '@distube/ytdl-core';
 import {WriteStream} from 'fs-capacitor';
 import ffmpeg from 'fluent-ffmpeg';
 import shuffle from 'array-shuffle';
 import {
   AudioPlayer,
   AudioPlayerState,
-  AudioPlayerStatus, AudioResource,
+  AudioPlayerStatus,
+  AudioResource,
   createAudioPlayer,
-  createAudioResource, DiscordGatewayAdapterCreator,
+  createAudioResource,
+  DiscordGatewayAdapterCreator,
   joinVoiceChannel,
   StreamType,
   VoiceConnection,
@@ -58,10 +60,6 @@ export enum STATUS {
   IDLE,
 }
 
-export interface PlayerEvents {
-  statusChange: (oldStatus: STATUS, newStatus: STATUS) => void;
-}
-
 export const DEFAULT_VOLUME = 100;
 
 export default class {
@@ -80,8 +78,6 @@ export default class {
   private nowPlaying: QueuedSong | null = null;
   private playPositionInterval: NodeJS.Timeout | undefined;
   private lastSongURL = '';
-  private type: StreamType | undefined;
-  private loudness: number | undefined;
 
   private positionInSeconds = 0;
   private readonly fileCache: FileCacheProvider;
@@ -406,10 +402,6 @@ export default class {
     this.queue.splice(this.queuePosition + index, amount);
   }
 
-  removeCurrent(): void {
-    this.queue = [...this.queue.slice(0, this.queuePosition), ...this.queue.slice(this.queuePosition + 1)];
-  }
-
   queueSize(): number {
     return this.getQueue().length;
   }
@@ -436,7 +428,6 @@ export default class {
 
   resetVolume() {
     this.volume = this.defaultVolume;
-    this.loudness = 0.1;
     this.setAudioPlayerVolume(this.volume);
   }
 
@@ -469,46 +460,29 @@ export default class {
     const ffmpegInputOptions: string[] = [];
     let shouldCacheVideo = false;
 
-    let format: InfoData['format'][0] | undefined;
+    let format: ytdl.videoFormat | undefined;
 
     ffmpegInput = await this.fileCache.getPathFor(this.getHashForCache(song.url));
 
-    // Not yet cached, must download
-    const info = await video_info(song.url);
-
-    // Set loudness for video regardless of cache or not.
-    // don't want to get earsexed
-    if (!info.video_details.live) {
-      const streamLoudness = info.format[info.format.length - 1].loudnessDb;
-      this.loudness = streamLoudness;
-      this.loudness = this.loudness ? 2 ** (-this.loudness / 10) : 1;
-      debug('Stream Loudness:', streamLoudness);
-      debug('Loudness:', this.loudness);
-    }
-
     if (!ffmpegInput) {
       // Not yet cached, must download
-      const info = await video_info(song.url);
+      const info = await ytdl.getInfo(song.url, {playerClients: ['IOS', 'WEB_CREATOR']});
 
-      // Don't cache livestreams or extra long videos
-      shouldCacheVideo = !info.video_details.live
-        && info.video_details.durationInSec < this.config.CACHE_DURATION_LIMIT_SECONDS;
+      const {formats} = info;
+      const filter = (format: ytdl.videoFormat) => format.codecs === 'opus'
+        && format.container === 'webm'
+        && format.audioSampleRate !== undefined
+        && parseInt(format.audioSampleRate, 10) === 48000;
+      format = formats.find(filter);
 
-      // Seeking doesn't seem to work with play-dl properly
-      if (!shouldCacheVideo && !options.seek) {
-        const stream = await stream_from_info(info);
-        debug('Not caching video');
-        debug('Spawned play-dl stream');
-        debug('Audio format:', stream.type);
-        this.type = stream.type;
+      const nextBestFormat = (formats: ytdl.videoFormat[]): ytdl.videoFormat | undefined => {
+        if (formats[0].isLive) {
+          formats = formats.sort((a, b) => (b as unknown as {audioBitrate: number}).audioBitrate - (a as unknown as {audioBitrate: number}).audioBitrate); // Bad typings
 
-        return stream.stream;
-      }
+          return formats.find(format => [128, 127, 120, 96, 95, 94, 93].includes(parseInt(format.itag as unknown as string, 10))); // Bad typings
+        }
 
-      format = info.format.at(info.format.length - 1);
-
-      if (format?.mimeType?.slice(0, 5) !== 'audio') { // Legacy video
-        const formats = info.format
+        formats = formats
           .filter(format => format.averageBitrate)
           .sort((a, b) => {
             if (a && b) {
@@ -517,19 +491,26 @@ export default class {
 
             return 0;
           });
-
-        format = formats.find(format => !format.bitrate) ?? formats[0];
-      }
+        return formats.find(format => !format.bitrate) ?? formats[0];
+      };
 
       if (!format) {
-        // If no format is found, throw
-        throw new Error('Can\'t find suitable format.');
+        format = nextBestFormat(info.formats);
+
+        if (!format) {
+          // If still no format is found, throw
+          throw new Error('Can\'t find suitable format.');
+        }
       }
 
       debug('Using format', format);
       ffmpegInput = format.url!;
 
-      shouldCacheVideo = shouldCacheVideo && !options.seek;
+      // Don't cache livestreams or long videos
+      shouldCacheVideo = !info.player_response.videoDetails.isLiveContent
+        && parseInt(info.videoDetails.lengthSeconds, 10) < this.config.CACHE_DURATION_LIMIT_SECONDS
+        && !options.seek;
+
       debug(shouldCacheVideo ? 'Caching video' : 'Not caching video');
 
       ffmpegInputOptions.push(...[
@@ -555,7 +536,6 @@ export default class {
       cacheKey: song.url,
       ffmpegInputOptions,
       cache: shouldCacheVideo,
-      volumeAdjustment: format?.loudnessDb ? `${-format.loudnessDb}dB` : undefined,
     });
   }
 
@@ -649,14 +629,13 @@ export default class {
         .noVideo()
         .audioCodec('libopus')
         .outputFormat('webm')
-        .addOutputOption(['-filter:a', `volume=${options?.volumeAdjustment ?? '1'}`])
         .on('error', error => {
           if (!hasReturnedStreamClosed) {
             reject(error);
           }
         })
         .on('start', command => {
-          debug(`Spawned ffmpeg with ${command as string}`);
+          debug(`Spawned ffmpeg with ${command}`);
         });
 
       stream.pipe(capacitor);
@@ -675,7 +654,7 @@ export default class {
 
   private createAudioStream(stream: Readable) {
     return createAudioResource(stream, {
-      inputType: this.type ?? StreamType.WebmOpus,
+      inputType: StreamType.WebmOpus,
       inlineVolume: true,
     });
   }
@@ -690,7 +669,6 @@ export default class {
 
   private setAudioPlayerVolume(level?: number) {
     // Audio resource expects a float between 0 and 1 to represent level percentage
-    this.loudness = this.loudness ?? 1;
-    this.audioResource?.volume?.setVolume((level ? level * this.loudness : (this.getVolume()) / 100) * this.loudness);
+    this.audioResource?.volume?.setVolume((level ?? this.getVolume()) / 100);
   }
 }

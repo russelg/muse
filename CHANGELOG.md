@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Change back to @distube/ytdl-core for better playback support.
+
 ## [2.12.0] - 2024-08-25
 
 ### Added

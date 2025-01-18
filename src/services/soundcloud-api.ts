@@ -28,6 +28,10 @@ export default class {
       },
     ));
 
+    if (!items) {
+      throw new Error('Track could not be found.');
+    }
+
     const track = items.collection.at(0);
 
     if (!track) {
