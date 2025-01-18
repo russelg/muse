@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.13.0] - 2025-01-18
+
 ### Fixed
 - Change back to @distube/ytdl-core for better playback support.
 
@@ -378,7 +380,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial release
 
-[unreleased]: https://github.com/russelg/muse/compare/v2.12.0...HEAD
+[unreleased]: https://github.com/russelg/muse/compare/v2.13.0...HEAD
+[2.13.0]: https://github.com/russelg/muse/compare/v2.12.0...v2.13.0
 [2.12.0]: https://github.com/russelg/muse/compare/v2.11.0...v2.12.0
 [2.11.0]: https://github.com/russelg/muse/compare/v2.9.3...v2.11.0
 [2.10.1]: https://github.com/russelg/muse/compare/v2.10.0...v2.10.1
