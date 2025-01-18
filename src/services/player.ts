@@ -48,6 +48,7 @@ export interface SongMetadata {
   thumbnailUrl: string | null;
   source: MediaSource;
 }
+
 export interface QueuedSong extends SongMetadata {
   addedInChannelId: Snowflake;
   requestedBy: string;
@@ -475,15 +476,17 @@ export default class {
         && parseInt(format.audioSampleRate, 10) === 48000;
       format = formats.find(filter);
 
-      const nextBestFormat = (formats: ytdl.videoFormat[]): ytdl.videoFormat | undefined => {
-        if (formats[0].isLive) {
-          formats = formats.sort((a, b) => (b as unknown as {audioBitrate: number}).audioBitrate - (a as unknown as {audioBitrate: number}).audioBitrate); // Bad typings
+      const nextBestFormat = (formats: Array<ytdl.videoFormat | undefined>): ytdl.videoFormat | undefined => {
+        if (formats[0]?.isLive) {
+          formats = formats.sort((a, b) => (b as unknown as {audioBitrate: number}).audioBitrate - (a as unknown as {
+            audioBitrate: number;
+          }).audioBitrate); // Bad typings
 
-          return formats.find(format => [128, 127, 120, 96, 95, 94, 93].includes(parseInt(format.itag as unknown as string, 10))); // Bad typings
+          return formats.find(format => format && [128, 127, 120, 96, 95, 94, 93].includes(parseInt(format.itag as unknown as string, 10))); // Bad typings
         }
 
         formats = formats
-          .filter(format => format.averageBitrate)
+          .filter(format => format?.averageBitrate)
           .sort((a, b) => {
             if (a && b) {
               return b.averageBitrate! - a.averageBitrate!;
@@ -491,10 +494,12 @@ export default class {
 
             return 0;
           });
-        return formats.find(format => !format.bitrate) ?? formats[0];
+        return formats.find(format => format && !format.bitrate) ?? formats[0];
       };
 
       if (!format) {
+        debug('Formats', formats);
+
         format = nextBestFormat(info.formats);
 
         if (!format) {
@@ -612,7 +617,13 @@ export default class {
     }
   }
 
-  private async createReadStream(options: {url: string | Readable; cacheKey: string; ffmpegInputOptions?: string[]; cache?: boolean; volumeAdjustment?: string}): Promise<Readable> {
+  private async createReadStream(options: {
+    url: string | Readable;
+    cacheKey: string;
+    ffmpegInputOptions?: string[];
+    cache?: boolean;
+    volumeAdjustment?: string;
+  }): Promise<Readable> {
     return new Promise((resolve, reject) => {
       const capacitor = new WriteStream();
 
