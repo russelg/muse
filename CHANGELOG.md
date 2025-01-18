@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Attempt to fix formats being undefined again
+
 ## [2.13.3] - 2025-01-18
 
 ### Fixed

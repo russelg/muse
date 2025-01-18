@@ -257,11 +257,8 @@ export default class {
 
         if (channelId) {
           debug(`${currentSong.title} is unavailable`);
-          return;
         }
       }
-
-      throw error;
     }
   }
 
@@ -469,12 +466,15 @@ export default class {
       // Not yet cached, must download
       const info = await ytdl.getInfo(song.url, {playerClients: ['IOS', 'WEB_CREATOR']});
 
-      const {formats} = info;
+      if (info.formats.length === 0) {
+        throw new Error('no formats found for song... try another song or try again');
+      }
+
       const filter = (format: ytdl.videoFormat) => format.codecs === 'opus'
         && format.container === 'webm'
         && format.audioSampleRate !== undefined
         && parseInt(format.audioSampleRate, 10) === 48000;
-      format = formats.find(filter);
+      format = info.formats.find(filter);
 
       const nextBestFormat = (formats: Array<ytdl.videoFormat | undefined>): ytdl.videoFormat | undefined => {
         if (formats[0]?.isLive) {
@@ -498,7 +498,7 @@ export default class {
       };
 
       if (!format) {
-        debug('Formats', formats);
+        debug('Formats', info.formats);
 
         format = nextBestFormat(info.formats);
 
