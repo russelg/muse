@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Add simple proxy configuration
+
 ## [2.13.5] - 2025-01-18
 
 ### Fixed

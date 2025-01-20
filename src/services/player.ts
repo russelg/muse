@@ -462,16 +462,28 @@ export default class {
 
     ffmpegInput = await this.fileCache.getPathFor(this.getHashForCache(song.url));
 
+    let agent: ytdl.Agent | undefined;
+
+    if (this.config.HTTP_PROXY) {
+      agent = ytdl.createProxyAgent({uri: this.config.HTTP_PROXY});
+    }
+
     if (!ffmpegInput) {
       // Not yet cached, must download
-      let info = await ytdl.getInfo(song.url, {playerClients: ['IOS', 'WEB_CREATOR']});
+      let info = await ytdl.getInfo(song.url, {playerClients: ['IOS', 'WEB_CREATOR'], agent});
+      debug('Info', info);
 
       if (info.formats.length === 0) {
         debug('Failed to find formats for song, trying again...');
-        info = await ytdl.getInfo(song.url, {playerClients: ['IOS', 'WEB_CREATOR']});
+        info = await ytdl.getInfo(song.url, {playerClients: ['IOS', 'WEB_CREATOR'], agent});
 
         if (info.formats.length === 0) {
-          throw new Error('no formats found for song... try another song or try again');
+          debug('Failed to find formats for song, trying again without agent...');
+          info = await ytdl.getInfo(song.url, {playerClients: ['IOS', 'WEB_CREATOR']});
+
+          if (info.formats.length === 0) {
+            throw new Error('no formats found for song... try another song or try again');
+          }
         }
       }
 
@@ -546,6 +558,7 @@ export default class {
       cacheKey: song.url,
       ffmpegInputOptions,
       cache: shouldCacheVideo,
+      proxy: this.config.HTTP_PROXY,
     });
   }
 
@@ -626,6 +639,7 @@ export default class {
     url: string | Readable;
     cacheKey: string;
     ffmpegInputOptions?: string[];
+    proxy?: string;
     cache?: boolean;
     volumeAdjustment?: string;
   }): Promise<Readable> {
@@ -640,8 +654,13 @@ export default class {
       const returnedStream = capacitor.createReadStream();
       let hasReturnedStreamClosed = false;
 
-      const stream = ffmpeg(options.url)
-        .inputOptions(options?.ffmpegInputOptions ?? ['-re'])
+      let stream = ffmpeg(options.url);
+
+      if (options?.proxy) {
+        stream = stream.withOption(['-http_proxy', options.proxy]);
+      }
+
+      stream = stream.inputOptions(options?.ffmpegInputOptions ?? ['-re'])
         .noVideo()
         .audioCodec('libopus')
         .outputFormat('webm')
