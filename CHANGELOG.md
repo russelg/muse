@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.14.0] - 2025-01-20
+
 ### Added
 - Add simple proxy configuration
 
@@ -408,7 +410,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial release
 
-[unreleased]: https://github.com/russelg/muse/compare/v2.13.5...HEAD
+[unreleased]: https://github.com/russelg/muse/compare/v2.14.0...HEAD
+[2.14.0]: https://github.com/russelg/muse/compare/v2.13.5...v2.14.0
 [2.13.5]: https://github.com/russelg/muse/compare/v2.13.4...v2.13.5
 [2.13.4]: https://github.com/russelg/muse/compare/v2.13.3...v2.13.4
 [2.13.3]: https://github.com/russelg/muse/compare/v2.13.2...v2.13.3
