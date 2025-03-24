@@ -10,7 +10,7 @@
     "sourceMap": true,
     "resolveJsonModule": true,
     "outDir": "dist",
-    "skipLibCheck": true,
+    "skipLibCheck": true
   },
   "include": ["src"],
   "exclude": ["node_modules"]

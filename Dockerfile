@@ -1,4 +1,4 @@
-FROM node:18.17-bullseye-slim AS base
+FROM node:18-bullseye-slim AS base
 
 # openssl will be a required package if base is updated to 18.16+ due to node:*-slim base distro change
 # https://github.com/prisma/prisma/issues/19729#issuecomment-1591270599
@@ -48,10 +48,10 @@ COPY . .
 ARG COMMIT_HASH=unknown
 ARG BUILD_DATE=unknown
 
-ENV DATA_DIR /data
-ENV NODE_ENV production
-ENV COMMIT_HASH $COMMIT_HASH
-ENV BUILD_DATE $BUILD_DATE
-ENV WEBSERVER_PORT 80
+ENV DATA_DIR=/data
+ENV NODE_ENV=production
+ENV COMMIT_HASH=$COMMIT_HASH
+ENV BUILD_DATE=$BUILD_DATE
+ENV ENV_FILE=/config
 
 CMD ["tini", "--", "node", "--enable-source-maps", "dist/scripts/migrate-and-start.js"]

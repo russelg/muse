@@ -70,7 +70,6 @@ export default class AddQueryToQueue {
     if (!targetVoiceChannel) {
       targetVoiceChannel = getMemberVoiceChannel(member)?.[0] ?? getMostPopularVoiceChannel(guild!)?.[0] ?? null;
     }
-
     const settings = await getGuildSettings(guildId);
 
     const {playlistLimit, queueAddResponseEphemeral} = settings;
@@ -85,7 +84,7 @@ export default class AddQueryToQueue {
     // Test if it's a complete URL
     try {
       const url = new URL(query);
-
+    
       const YOUTUBE_HOSTS = [
         'www.youtube.com',
         'youtu.be',
@@ -93,7 +92,6 @@ export default class AddQueryToQueue {
         'music.youtube.com',
         'www.music.youtube.com',
       ];
-
       if (YOUTUBE_HOSTS.includes(url.host)) {
         // YouTube source
         if (url.searchParams.get('list')) {
@@ -128,19 +126,6 @@ export default class AddQueryToQueue {
         }
 
         newSongs.push(...convertedSongs);
-      } else if (url.host === 'soundcloud.com') {
-        if (url.pathname.includes('/sets/')) {
-          const songs = await this.getSongs.soundcloudPlaylist(url.href);
-          newSongs.push(...songs);
-        } else {
-          const songs = await this.getSongs.soundcloudVideo(url.href);
-
-          if (songs) {
-            newSongs.push(...songs);
-          } else {
-            throw new Error('that doesn\'t exist');
-          }
-        }
       } else {
         const song = await this.getSongs.httpLiveStream(query);
 
@@ -172,10 +157,10 @@ export default class AddQueryToQueue {
     if (this.config.ENABLE_SPONSORBLOCK) {
       newSongs = await Promise.all(newSongs.map(this.skipNonMusicSegments.bind(this)));
     }
-
     const botName = this.config.BOT_NAME;
     const memberUsername = member?.nickname ?? member?.user.username ?? botName;
     const requestedByName = username ?? memberUsername;
+    
     newSongs.forEach(song => {
       player.add({
         ...song,
@@ -202,7 +187,6 @@ export default class AddQueryToQueue {
       if (wasPlayingSong) {
         statusMsg = 'resuming playback';
       }
-
       if (interaction) {
         await interaction.editReply({
           embeds: [buildPlayingMessageEmbed(player)],
@@ -239,18 +223,14 @@ export default class AddQueryToQueue {
       if (interaction) {
         await interaction.editReply(message);
       }
-
       return message;
     }
-
     const message = `u betcha, **${firstSong.title}** added to the${addToFrontOfQueue ? ' front of the' : ''} queue${extraMsg}`;
     if (interaction) {
       await interaction.editReply(message);
     }
-
     return message;
   }
-
   public async addToQueue({
     query,
     addToFrontOfQueue,
@@ -276,7 +256,6 @@ export default class AddQueryToQueue {
       guildId: interaction.guild!.id,
     });
   }
-
   private async skipNonMusicSegments(song: SongMetadata) {
     if (!this.sponsorBlock
           || (this.sponsorBlockDisabledUntil && new Date() < this.sponsorBlockDisabledUntil)

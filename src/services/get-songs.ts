@@ -1,22 +1,101 @@
-import {inject, injectable} from 'inversify';
+import {inject, injectable, optional} from 'inversify';
 import * as spotifyURI from 'spotify-uri';
 import {SongMetadata, QueuedPlaylist, MediaSource} from './player.js';
 import {TYPES} from '../types.js';
 import ffmpeg from 'fluent-ffmpeg';
 import YoutubeAPI from './youtube-api.js';
 import SpotifyAPI, {SpotifyTrack} from './spotify-api.js';
-import SoundcloudAPI from './soundcloud-api.js';
+import {URL} from 'node:url';
 
 @injectable()
 export default class {
   private readonly youtubeAPI: YoutubeAPI;
-  private readonly spotifyAPI: SpotifyAPI;
-  private readonly soundcloudAPI: SoundcloudAPI;
+  private readonly spotifyAPI?: SpotifyAPI;
 
-  constructor(@inject(TYPES.Services.YoutubeAPI) youtubeAPI: YoutubeAPI, @inject(TYPES.Services.SpotifyAPI) spotifyAPI: SpotifyAPI, @inject(TYPES.Services.SoundCloudAPI) soundcloudAPI: SoundcloudAPI) {
+  constructor(@inject(TYPES.Services.YoutubeAPI) youtubeAPI: YoutubeAPI, @inject(TYPES.Services.SpotifyAPI) @optional() spotifyAPI?: SpotifyAPI) {
     this.youtubeAPI = youtubeAPI;
     this.spotifyAPI = spotifyAPI;
-    this.soundcloudAPI = soundcloudAPI;
+  }
+
+  async getSongs(query: string, playlistLimit: number, shouldSplitChapters: boolean): Promise<[SongMetadata[], string]> {
+    const newSongs: SongMetadata[] = [];
+    let extraMsg = '';
+
+    // Test if it's a complete URL
+    try {
+      const url = new URL(query);
+
+      const YOUTUBE_HOSTS = [
+        'www.youtube.com',
+        'youtu.be',
+        'youtube.com',
+        'music.youtube.com',
+        'www.music.youtube.com',
+      ];
+
+      if (YOUTUBE_HOSTS.includes(url.host)) {
+        // YouTube source
+        if (url.searchParams.get('list')) {
+          // YouTube playlist
+          newSongs.push(...await this.youtubePlaylist(url.searchParams.get('list')!, shouldSplitChapters));
+        } else {
+          const songs = await this.youtubeVideo(url.href, shouldSplitChapters);
+
+          if (songs) {
+            newSongs.push(...songs);
+          } else {
+            throw new Error('that doesn\'t exist');
+          }
+        }
+      } else if (url.protocol === 'spotify:' || url.host === 'open.spotify.com') {
+        if (this.spotifyAPI === undefined) {
+          throw new Error('Spotify is not enabled!');
+        }
+
+        const [convertedSongs, nSongsNotFound, totalSongs] = await this.spotifySource(query, playlistLimit, shouldSplitChapters);
+
+        if (totalSongs > playlistLimit) {
+          extraMsg = `a random sample of ${playlistLimit} songs was taken`;
+        }
+
+        if (totalSongs > playlistLimit && nSongsNotFound !== 0) {
+          extraMsg += ' and ';
+        }
+
+        if (nSongsNotFound !== 0) {
+          if (nSongsNotFound === 1) {
+            extraMsg += '1 song was not found';
+          } else {
+            extraMsg += `${nSongsNotFound.toString()} songs were not found`;
+          }
+        }
+
+        newSongs.push(...convertedSongs);
+      } else {
+        const song = await this.httpLiveStream(query);
+
+        if (song) {
+          newSongs.push(song);
+        } else {
+          throw new Error('that doesn\'t exist');
+        }
+      }
+    } catch (err: any) {
+      if (err instanceof Error && err.message === 'Spotify is not enabled!') {
+        throw err;
+      }
+
+      // Not a URL, must search YouTube
+      const songs = await this.youtubeVideoSearch(query, shouldSplitChapters);
+
+      if (songs) {
+        newSongs.push(...songs);
+      } else {
+        throw new Error('that doesn\'t exist');
+      }
+    }
+
+    return [newSongs, extraMsg];
   }
 
   async youtubeVideoSearch(query: string, shouldSplitChapters: boolean): Promise<SongMetadata[]> {
@@ -31,23 +110,11 @@ export default class {
     return this.youtubeAPI.getPlaylist(listId, shouldSplitChapters);
   }
 
-  async soundcloudVideoSearch(query: string): Promise<SongMetadata[]> {
-    return this.soundcloudAPI.search(query);
-  }
-
-  async soundcloudVideo(url: string): Promise<SongMetadata[]> {
-    return this.soundcloudAPI.get(url);
-  }
-
-  async soundcloudPlaylist(listId: string): Promise<SongMetadata[]> {
-    return this.soundcloudAPI.getPlaylist(listId);
-  }
-
-  async soundcloudArtist(listId: string): Promise<SongMetadata[]> {
-    return this.soundcloudAPI.getArtist(listId);
-  }
-
   async spotifySource(url: string, playlistLimit: number, shouldSplitChapters: boolean): Promise<[SongMetadata[], number, number]> {
+    if (this.spotifyAPI === undefined) {
+      return [[], 0, 0];
+    }
+
     const parsed = spotifyURI.parse(url);
 
     switch (parsed.type) {

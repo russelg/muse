@@ -8,9 +8,11 @@ import Config from '../services/config.js';
 @injectable()
 export default class {
   private readonly guildPlayers: Map<string, Player>;
+  private readonly fileCache: FileCacheProvider;
 
-  constructor(@inject(TYPES.FileCache) private readonly fileCache: FileCacheProvider, @inject(TYPES.ThirdParty) private readonly thirdparty: ThirdParty, @inject(TYPES.Config) private readonly config: Config) {
+  constructor(@inject(TYPES.FileCache) fileCache: FileCacheProvider, @inject(TYPES.ThirdParty) private readonly thirdparty: ThirdParty, @inject(TYPES.Config) private readonly config: Config) {
     this.guildPlayers = new Map();
+    this.fileCache = fileCache;
   }
 
   get(guildId: string): Player {
