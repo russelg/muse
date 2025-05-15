@@ -93,7 +93,6 @@ export default class AddQueryToQueue {
         'music.youtube.com',
         'www.music.youtube.com',
       ];
-
       if (YOUTUBE_HOSTS.includes(url.host)) {
         // YouTube source
         if (url.searchParams.get('list')) {
@@ -128,19 +127,6 @@ export default class AddQueryToQueue {
         }
 
         newSongs.push(...convertedSongs);
-      } else if (url.host === 'soundcloud.com') {
-        if (url.pathname.includes('/sets/')) {
-          const songs = await this.getSongs.soundcloudPlaylist(url.href);
-          newSongs.push(...songs);
-        } else {
-          const songs = await this.getSongs.soundcloudVideo(url.href);
-
-          if (songs) {
-            newSongs.push(...songs);
-          } else {
-            throw new Error('that doesn\'t exist');
-          }
-        }
       } else {
         const song = await this.getSongs.httpLiveStream(query);
 
@@ -176,6 +162,7 @@ export default class AddQueryToQueue {
     const botName = this.config.BOT_NAME;
     const memberUsername = member?.nickname ?? member?.user.username ?? botName;
     const requestedByName = username ?? memberUsername;
+
     newSongs.forEach(song => {
       player.add({
         ...song,

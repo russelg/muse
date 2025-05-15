@@ -30,10 +30,6 @@ const getSongTitleInfo = ({title, url, offset, source}: QueuedSong) => {
     return {title, url, youtubeId: null, source: 'HLS'};
   }
 
-  if (source === MediaSource.SoundCloud) {
-    return {title, url, youtubeId: null, source: 'Soundcloud'};
-  }
-
   const songTitle = title.replace(/\[.*\]/, '').trim();
   const youtubeId = url.length === 11 ? url : getYouTubeID(url) ?? '';
 
@@ -100,6 +96,11 @@ export default class {
         debug(e);
         res.send({success: false, error: e});
       }
+    });
+
+    this.app.get('/hello', async (req, res) => {
+      res.send('hello world!');
+      console.log(req);
     });
 
     this.app.post('/play/:guildId/:password', express.json({type: '*/*'}), async (req, res) => {

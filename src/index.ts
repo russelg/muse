@@ -5,6 +5,7 @@ import {TYPES} from './types.js';
 import Api from './api.js';
 import Bot from './bot.js';
 import Config from './services/config.js';
+import InnertubeManager from './managers/innertube.js';
 import FileCacheProvider from './services/file-cache.js';
 
 const api = container.get<Api>(TYPES.Api);
@@ -19,6 +20,9 @@ const startBot = async () => {
   await makeDir(path.join(config.CACHE_DIR, 'tmp'));
 
   await container.get<FileCacheProvider>(TYPES.FileCache).cleanup();
+
+  const innertube = container.get<InnertubeManager>(TYPES.Managers.Innertube);
+  await innertube.initialize();
 
   await bot.register();
 

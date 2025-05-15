@@ -74,7 +74,7 @@ export default class {
   }
 
   async search(query: string, shouldSplitChapters: boolean): Promise<SongMetadata[]> {
-    const result = await this.ytsrQueue.add(async () => this.cache.wrap(
+    const result = await this.ytsrQueue.add<ytsr.VideoResult>(async () => this.cache.wrap(
       ytsr,
       query,
       {
@@ -85,8 +85,8 @@ export default class {
       },
     ));
 
-    if (!result) {
-      throw new Error('No video found.');
+    if (result === undefined) {
+      return [];
     }
 
     let firstVideo: Video | undefined;
@@ -99,7 +99,7 @@ export default class {
     }
 
     if (!firstVideo) {
-      throw new Error('No video found.');
+      return [];
     }
 
     return this.getVideo(firstVideo.url, shouldSplitChapters);

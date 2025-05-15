@@ -9,12 +9,12 @@ export const TYPES = {
   ThirdParty: Symbol('ThirdParty'),
   Managers: {
     Player: Symbol('PlayerManager'),
+    Innertube: Symbol('Innertube'),
   },
   Services: {
     AddQueryToQueue: Symbol('AddQueryToQueue'),
     GetSongs: Symbol('GetSongs'),
     YoutubeAPI: Symbol('YoutubeAPI'),
     SpotifyAPI: Symbol('SpotifyAPI'),
-    SoundCloudAPI: Symbol('SoundCloudAPI'),
   },
 };

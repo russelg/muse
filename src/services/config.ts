@@ -5,25 +5,21 @@ import path from 'path';
 import xbytes from 'xbytes';
 import {ConditionalKeys} from 'type-fest';
 import {ActivityType, PresenceStatusData} from 'discord.js';
-dotenv.config();
+dotenv.config({path: process.env.ENV_FILE ?? path.resolve(process.cwd(), '.env')});
 
 export const DATA_DIR = path.resolve(process.env.DATA_DIR ? process.env.DATA_DIR : './data');
 
 const CONFIG_MAP = {
   DISCORD_TOKEN: process.env.DISCORD_TOKEN,
   YOUTUBE_API_KEY: process.env.YOUTUBE_API_KEY,
-  SPOTIFY_CLIENT_ID: process.env.SPOTIFY_CLIENT_ID,
-  SPOTIFY_CLIENT_SECRET: process.env.SPOTIFY_CLIENT_SECRET,
-  SOUNDCLOUD_CLIENT_ID: process.env.SOUNDCLOUD_CLIENT_ID,
-  SOUNDCLOUD_OAUTH_TOKEN: process.env.SOUNDCLOUD_OAUTH_TOKEN,
+  SPOTIFY_CLIENT_ID: process.env.SPOTIFY_CLIENT_ID ?? '',
+  SPOTIFY_CLIENT_SECRET: process.env.SPOTIFY_CLIENT_SECRET ?? '',
   WEBSERVER_PORT: process.env.WEBSERVER_PORT ?? 80,
   WEBSERVER_PASSWORD: process.env.WEBSERVER_PASSWORD ?? '',
-  HTTP_PROXY: process.env.HTTP_PROXY,
   REGISTER_COMMANDS_ON_BOT: process.env.REGISTER_COMMANDS_ON_BOT === 'true',
   DATA_DIR,
   CACHE_DIR: path.join(DATA_DIR, 'cache'),
   CACHE_LIMIT_IN_BYTES: xbytes.parseSize(process.env.CACHE_LIMIT ?? '2GB'),
-  CACHE_DURATION_LIMIT_SECONDS: process.env.CACHE_DURATION_LIMIT_SECONDS ?? (30 * 60),
   BOT_NAME: process.env.BOT_NAME ?? 'fartbot',
   BOT_STATUS: process.env.BOT_STATUS ?? 'online',
   BOT_ACTIVITY_TYPE: process.env.BOT_ACTIVITY_TYPE ?? 'LISTENING',
@@ -45,17 +41,13 @@ export default class Config {
   readonly DISCORD_TOKEN!: string;
   readonly WEBSERVER_PORT!: number;
   readonly WEBSERVER_PASSWORD!: string;
-  readonly HTTP_PROXY!: string;
   readonly YOUTUBE_API_KEY!: string;
   readonly SPOTIFY_CLIENT_ID!: string;
   readonly SPOTIFY_CLIENT_SECRET!: string;
-  readonly SOUNDCLOUD_CLIENT_ID!: string;
-  readonly SOUNDCLOUD_OAUTH_TOKEN!: string;
   readonly REGISTER_COMMANDS_ON_BOT!: boolean;
   readonly DATA_DIR!: string;
   readonly CACHE_DIR!: string;
   readonly CACHE_LIMIT_IN_BYTES!: number;
-  readonly CACHE_DURATION_LIMIT_SECONDS!: number;
   readonly BOT_NAME!: string;
   readonly BOT_STATUS!: PresenceStatusData;
   readonly BOT_ACTIVITY_TYPE!: Exclude<ActivityType, ActivityType.Custom>;
