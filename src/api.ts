@@ -98,8 +98,8 @@ export default class {
       }
     });
 
-    this.app.get('/hello', async (req,res)=>{
-      res.send('hello world!')
+    this.app.get('/hello', async (req, res) => {
+      res.send('hello world!');
       console.log(req);
     });
 

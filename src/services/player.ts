@@ -415,7 +415,7 @@ export default class {
 
     return null;
   }
-  
+
   getQueuePosition(): number {
     return this.queuePosition;
   }
@@ -432,9 +432,9 @@ export default class {
    * Returns queue, before the current song.
    * @returns {QueuedSong[]}
    */
-    getQueueHistory(): QueuedSong[] {
-      return this.queue.slice(0, this.queuePosition);
-    }
+  getQueueHistory(): QueuedSong[] {
+    return this.queue.slice(0, this.queuePosition);
+  }
 
   add(song: QueuedSong, {immediate = false} = {}): void {
     if (song.playlist || !immediate) {
