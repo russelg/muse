@@ -19,7 +19,7 @@ export default class {
     let player = this.guildPlayers.get(guildId);
 
     if (!player) {
-      player = new Player(this.thirdparty, this.fileCache, this.config, guildId);
+      player = new Player( this.fileCache, guildId);
 
       this.guildPlayers.set(guildId, player);
     }
