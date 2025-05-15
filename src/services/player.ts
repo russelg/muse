@@ -1,35 +1,32 @@
-import {Snowflake, VoiceChannel} from 'discord.js';
-import {Readable} from 'stream';
-import hasha from 'hasha';
-import ytdl from '@distube/ytdl-core';
-import {WriteStream} from 'fs-capacitor';
-import ffmpeg from 'fluent-ffmpeg';
-import shuffle from 'array-shuffle';
 import {
   AudioPlayer,
   AudioPlayerState,
-  AudioPlayerStatus,
-  AudioResource,
+  AudioPlayerStatus, AudioResource,
   createAudioPlayer,
-  createAudioResource,
-  DiscordGatewayAdapterCreator,
+  createAudioResource, DiscordGatewayAdapterCreator,
   joinVoiceChannel,
   StreamType,
   VoiceConnection,
   VoiceConnectionStatus,
 } from '@discordjs/voice';
-import FileCacheProvider from './file-cache.js';
+
+import {Setting} from '@prisma/client';
+import shuffle from 'array-shuffle';
+import {Snowflake, VoiceChannel} from 'discord.js';
+import ffmpeg from 'fluent-ffmpeg';
+import {WriteStream} from 'fs-capacitor';
+import hasha from 'hasha';
+import {Readable} from 'stream';
+import {buildPlayingMessageEmbed} from '../utils/build-embed.js';
 import debug from '../utils/debug.js';
 import {getGuildSettings} from '../utils/get-guild-settings.js';
-import {buildPlayingMessageEmbed} from '../utils/build-embed.js';
-import ThirdParty from './third-party.js';
-import Soundcloud from 'soundcloud.ts';
-import Config from './config.js';
+import FileCacheProvider from './file-cache.js';
+import {Format} from 'youtubei.js/dist/src/parser/misc.js';
+import {innertube} from '../utils/innertube.js';
 
 export enum MediaSource {
   Youtube,
   HLS,
-  SoundCloud,
 }
 
 export interface QueuedPlaylist {
@@ -40,7 +37,7 @@ export interface QueuedPlaylist {
 export interface SongMetadata {
   title: string;
   artist: string;
-  url: string;
+  url: string; // For YT, it's the video ID (not the full URI)
   length: number;
   offset: number;
   playlist: QueuedPlaylist | null;
@@ -48,7 +45,6 @@ export interface SongMetadata {
   thumbnailUrl: string | null;
   source: MediaSource;
 }
-
 export interface QueuedSong extends SongMetadata {
   addedInChannelId: Snowflake;
   requestedBy: string;
@@ -59,6 +55,10 @@ export enum STATUS {
   PLAYING,
   PAUSED,
   IDLE,
+}
+
+export interface PlayerEvents {
+  statusChange: (oldStatus: STATUS, newStatus: STATUS) => void;
 }
 
 export const DEFAULT_VOLUME = 100;
@@ -82,15 +82,17 @@ export default class {
 
   private positionInSeconds = 0;
   private readonly fileCache: FileCacheProvider;
-  private readonly soundcloud: Soundcloud;
-  private readonly config: Config;
   private disconnectTimer: NodeJS.Timeout | null = null;
 
-  constructor(thirdParty: ThirdParty, fileCache: FileCacheProvider, config: Config, guildId: string) {
-    this.soundcloud = thirdParty.soundcloud;
+  private readonly channelToSpeakingUsers: Map<string, Set<string>> = new Map();
+
+  constructor(fileCache: FileCacheProvider, guildId: string) {
     this.fileCache = fileCache;
-    this.config = config;
     this.guildId = guildId;
+  }
+
+  public get isChannelEmpty(): boolean {
+    return this.currentChannel ? this.currentChannel.members.size === 0 : true;
   }
 
   async connect(channel: VoiceChannel): Promise<void> {
@@ -102,8 +104,14 @@ export default class {
     this.voiceConnection = joinVoiceChannel({
       channelId: channel.id,
       guildId: channel.guild.id,
+      selfDeaf: false,
       adapterCreator: channel.guild.voiceAdapterCreator as DiscordGatewayAdapterCreator,
     });
+
+    // Set the current channel so the getter isChannelEmpty works correctly
+    this.currentChannel = channel;
+
+    const guildSettings = await getGuildSettings(this.guildId);
 
     // Workaround to disable keepAlive
     this.voiceConnection.on('stateChange', (oldState, newState) => {
@@ -120,7 +128,10 @@ export default class {
       newNetworking?.on('stateChange', networkStateChangeHandler);
       /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
 
-      this.currentChannel = channel;
+      // currentChannel is already set above
+      if (newState.status === VoiceConnectionStatus.Ready) {
+        this.registerVoiceActivityListener(guildSettings);
+      }
     });
   }
 
@@ -257,8 +268,11 @@ export default class {
 
         if (channelId) {
           debug(`${currentSong.title} is unavailable`);
+          return;
         }
       }
+
+      throw error;
     }
   }
 
@@ -305,6 +319,63 @@ export default class {
     }
   }
 
+  registerVoiceActivityListener(guildSettings: Setting) {
+    const {turnDownVolumeWhenPeopleSpeak, turnDownVolumeWhenPeopleSpeakTarget} = guildSettings;
+    if (!turnDownVolumeWhenPeopleSpeak || !this.voiceConnection) {
+      return;
+    }
+
+    this.voiceConnection.receiver.speaking.on('start', (userId: string) => {
+      if (!this.currentChannel) {
+        return;
+      }
+
+      const member = this.currentChannel.members.get(userId);
+      const channelId = this.currentChannel?.id;
+
+      if (member) {
+        if (!this.channelToSpeakingUsers.has(channelId)) {
+          this.channelToSpeakingUsers.set(channelId, new Set());
+        }
+
+        this.channelToSpeakingUsers.get(channelId)?.add(member.id);
+      }
+
+      this.suppressVoiceWhenPeopleAreSpeaking(turnDownVolumeWhenPeopleSpeakTarget);
+    });
+
+    this.voiceConnection.receiver.speaking.on('end', (userId: string) => {
+      if (!this.currentChannel) {
+        return;
+      }
+
+      const member = this.currentChannel.members.get(userId);
+      const channelId = this.currentChannel.id;
+      if (member) {
+        if (!this.channelToSpeakingUsers.has(channelId)) {
+          this.channelToSpeakingUsers.set(channelId, new Set());
+        }
+
+        this.channelToSpeakingUsers.get(channelId)?.delete(member.id);
+      }
+
+      this.suppressVoiceWhenPeopleAreSpeaking(turnDownVolumeWhenPeopleSpeakTarget);
+    });
+  }
+
+  suppressVoiceWhenPeopleAreSpeaking(turnDownVolumeWhenPeopleSpeakTarget: number): void {
+    if (!this.currentChannel) {
+      return;
+    }
+
+    const speakingUsers = this.channelToSpeakingUsers.get(this.currentChannel.id);
+    if (speakingUsers && speakingUsers.size > 0) {
+      this.setVolume(turnDownVolumeWhenPeopleSpeakTarget);
+    } else {
+      this.setVolume(this.defaultVolume);
+    }
+  }
+
   canGoForward(skip: number) {
     return (this.queuePosition + skip - 1) < this.queue.length;
   }
@@ -344,7 +415,7 @@ export default class {
 
     return null;
   }
-
+  
   getQueuePosition(): number {
     return this.queuePosition;
   }
@@ -361,9 +432,9 @@ export default class {
    * Returns queue, before the current song.
    * @returns {QueuedSong[]}
    */
-  getQueueHistory(): QueuedSong[] {
-    return this.queue.slice(0, this.queuePosition);
-  }
+    getQueueHistory(): QueuedSong[] {
+      return this.queue.slice(0, this.queuePosition);
+    }
 
   add(song: QueuedSong, {immediate = false} = {}): void {
     if (song.playlist || !immediate) {
@@ -400,6 +471,10 @@ export default class {
     this.queue.splice(this.queuePosition + index, amount);
   }
 
+  removeCurrent(): void {
+    this.queue = [...this.queue.slice(0, this.queuePosition), ...this.queue.slice(this.queuePosition + 1)];
+  }
+
   queueSize(): number {
     return this.getQueue().length;
   }
@@ -424,9 +499,10 @@ export default class {
     return this.queue[this.queuePosition + to];
   }
 
-  resetVolume() {
-    this.volume = this.defaultVolume;
-    this.setAudioPlayerVolume(this.volume);
+  setVolume(level: number): void {
+    // Level should be a number between 0 and 100 = 0% => 100%
+    this.volume = level;
+    this.setAudioPlayerVolume(level);
   }
 
   getVolume(): number {
@@ -449,89 +525,28 @@ export default class {
       return this.createReadStream({url: song.url, cacheKey: song.url});
     }
 
-    if (song.source === MediaSource.SoundCloud) {
-      const scSong = await this.soundcloud.util.streamTrack(song.url) as Readable;
-      return this.createReadStream({url: scSong, cacheKey: song.url});
-    }
-
     let ffmpegInput: string | null;
     const ffmpegInputOptions: string[] = [];
     let shouldCacheVideo = false;
 
-    let format: ytdl.videoFormat | undefined;
+    let format: Format | undefined;
 
     ffmpegInput = await this.fileCache.getPathFor(this.getHashForCache(song.url));
 
-    let agent: ytdl.Agent | undefined;
-
-    if (this.config.HTTP_PROXY) {
-      agent = ytdl.createProxyAgent({uri: this.config.HTTP_PROXY});
-    }
-
     if (!ffmpegInput) {
       // Not yet cached, must download
-      let info = await ytdl.getInfo(song.url, {playerClients: ['IOS', 'WEB_CREATOR'], agent});
-      debug('Info', info);
-
-      if (info.formats.length === 0) {
-        debug('Failed to find formats for song, trying again...');
-        info = await ytdl.getInfo(song.url, {playerClients: ['IOS', 'WEB_CREATOR'], agent});
-
-        if (info.formats.length === 0) {
-          debug('Failed to find formats for song, trying again without agent...');
-          info = await ytdl.getInfo(song.url, {playerClients: ['IOS', 'WEB_CREATOR']});
-
-          if (info.formats.length === 0) {
-            throw new Error('no formats found for song... try another song or try again');
-          }
-        }
-      }
-
-      const filter = (format: ytdl.videoFormat) => format.codecs === 'opus'
-        && format.container === 'webm'
-        && format.audioSampleRate !== undefined
-        && parseInt(format.audioSampleRate, 10) === 48000;
-      format = info.formats.find(filter);
-
-      const nextBestFormat = (formats: Array<ytdl.videoFormat | undefined>): ytdl.videoFormat | undefined => {
-        if (formats[0]?.isLive) {
-          formats = formats.sort((a, b) => (b as unknown as {audioBitrate: number}).audioBitrate - (a as unknown as {
-            audioBitrate: number;
-          }).audioBitrate); // Bad typings
-
-          return formats.find(format => format && [128, 127, 120, 96, 95, 94, 93].includes(parseInt(format.itag as unknown as string, 10))); // Bad typings
-        }
-
-        formats = formats
-          .filter(format => format?.averageBitrate)
-          .sort((a, b) => {
-            if (a && b) {
-              return b.averageBitrate! - a.averageBitrate!;
-            }
-
-            return 0;
-          });
-        return formats.find(format => format && !format.bitrate) ?? formats[0];
-      };
-
-      if (!format) {
-        debug('Formats', info.formats);
-
-        format = nextBestFormat(info.formats);
-
-        if (!format) {
-          // If still no format is found, throw
-          throw new Error('Can\'t find suitable format.');
-        }
-      }
-
+      const inner = await innertube();
+      const info = await inner.getInfo(song.url);
+      format = info.chooseFormat({});
       debug('Using format', format);
-      ffmpegInput = format.url!;
+      if (!format.url) {
+        throw new Error('No URL found for format.');
+      }
 
+      ffmpegInput = format.url;
       // Don't cache livestreams or long videos
-      shouldCacheVideo = !info.player_response.videoDetails.isLiveContent
-        && parseInt(info.videoDetails.lengthSeconds, 10) < this.config.CACHE_DURATION_LIMIT_SECONDS
-        && !options.seek;
+      const MAX_CACHE_LENGTH_SECONDS = 30 * 60; // 30 minutes
+      shouldCacheVideo = !info.basic_info.is_live && (info?.basic_info.duration ?? 0) < MAX_CACHE_LENGTH_SECONDS && !options.seek;
 
       debug(shouldCacheVideo ? 'Caching video' : 'Not caching video');
 
@@ -558,7 +573,6 @@ export default class {
       cacheKey: song.url,
       ffmpegInputOptions,
       cache: shouldCacheVideo,
-      proxy: this.config.HTTP_PROXY,
     });
   }
 
@@ -587,17 +601,21 @@ export default class {
       return;
     }
 
-    if (this.voiceConnection.listeners(VoiceConnectionStatus.Disconnected).length === 0) {
-      this.voiceConnection.on(VoiceConnectionStatus.Disconnected, this.onVoiceConnectionDisconnect.bind(this));
-    }
+    this.voiceConnection.on('stateChange', () => {
+      if (this.currentChannel?.members.size === 0) {
+        this.voiceConnection!.on(VoiceConnectionStatus.Disconnected, this.onVoiceConnectionDisconnect.bind(this));
+      }
+    });
 
     if (!this.audioPlayer) {
       return;
     }
 
-    if (this.audioPlayer.listeners('stateChange').length === 0) {
-      this.audioPlayer.on(AudioPlayerStatus.Idle, this.onAudioPlayerIdle.bind(this));
-    }
+    this.audioPlayer.on('stateChange', () => {
+      if (this.currentChannel?.members.size === 0) {
+        this.audioPlayer!.on(AudioPlayerStatus.Idle, this.onAudioPlayerIdle.bind(this));
+      }
+    });
   }
 
   private onVoiceConnectionDisconnect(): void {
@@ -635,35 +653,26 @@ export default class {
     }
   }
 
-  private async createReadStream(options: {
-    url: string | Readable;
-    cacheKey: string;
-    ffmpegInputOptions?: string[];
-    proxy?: string;
-    cache?: boolean;
-    volumeAdjustment?: string;
-  }): Promise<Readable> {
+  private async createReadStream(options: {url: string; cacheKey: string; ffmpegInputOptions?: string[]; cache?: boolean; volumeAdjustment?: string}): Promise<Readable> {
     return new Promise((resolve, reject) => {
       const capacitor = new WriteStream();
-
       if (options?.cache) {
-        const cacheStream = this.fileCache.createWriteStream(this.getHashForCache(options.cacheKey));
+        const cacheStream = this.fileCache.createWriteStream(
+          this.getHashForCache(options.cacheKey),
+        );
+
         capacitor.createReadStream().pipe(cacheStream);
       }
 
       const returnedStream = capacitor.createReadStream();
       let hasReturnedStreamClosed = false;
 
-      let stream = ffmpeg(options.url);
-
-      if (options?.proxy) {
-        stream = stream.withOption(['-http_proxy', options.proxy]);
-      }
-
-      stream = stream.inputOptions(options?.ffmpegInputOptions ?? ['-re'])
+      const stream = ffmpeg(options.url)
+        .inputOptions(options?.ffmpegInputOptions ?? ['-re'])
         .noVideo()
         .audioCodec('libopus')
         .outputFormat('webm')
+        .addOutputOption(['-filter:a', `volume=${options?.volumeAdjustment ?? '1'}`])
         .on('error', error => {
           if (!hasReturnedStreamClosed) {
             reject(error);

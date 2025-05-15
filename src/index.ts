@@ -24,5 +24,4 @@ const startBot = async () => {
 
   api.start();
 };
-
 export {startBot};
