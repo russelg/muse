@@ -9,6 +9,7 @@ export const TYPES = {
   ThirdParty: Symbol('ThirdParty'),
   Managers: {
     Player: Symbol('PlayerManager'),
+    Innertube: Symbol('Innertube'),
   },
   Services: {
     AddQueryToQueue: Symbol('AddQueryToQueue'),

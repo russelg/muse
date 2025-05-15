@@ -1,9 +1,11 @@
 import {
   AudioPlayer,
   AudioPlayerState,
-  AudioPlayerStatus, AudioResource,
+  AudioPlayerStatus,
+  AudioResource,
   createAudioPlayer,
-  createAudioResource, DiscordGatewayAdapterCreator,
+  createAudioResource,
+  DiscordGatewayAdapterCreator,
   joinVoiceChannel,
   StreamType,
   VoiceConnection,
@@ -22,7 +24,7 @@ import debug from '../utils/debug.js';
 import {getGuildSettings} from '../utils/get-guild-settings.js';
 import FileCacheProvider from './file-cache.js';
 import {Format} from 'youtubei.js/dist/src/parser/misc.js';
-import {innertube} from '../utils/innertube.js';
+import InnertubeManager from '../managers/innertube.js';
 
 export enum MediaSource {
   Youtube,
@@ -45,6 +47,7 @@ export interface SongMetadata {
   thumbnailUrl: string | null;
   source: MediaSource;
 }
+
 export interface QueuedSong extends SongMetadata {
   addedInChannelId: Snowflake;
   requestedBy: string;
@@ -82,13 +85,15 @@ export default class {
 
   private positionInSeconds = 0;
   private readonly fileCache: FileCacheProvider;
+  private readonly innertubeManager: InnertubeManager;
   private disconnectTimer: NodeJS.Timeout | null = null;
 
   private readonly channelToSpeakingUsers: Map<string, Set<string>> = new Map();
 
-  constructor(fileCache: FileCacheProvider, guildId: string) {
+  constructor(fileCache: FileCacheProvider, guildId: string, innertubeManager: InnertubeManager) {
     this.fileCache = fileCache;
     this.guildId = guildId;
+    this.innertubeManager = innertubeManager;
   }
 
   public get isChannelEmpty(): boolean {
@@ -535,10 +540,16 @@ export default class {
 
     if (!ffmpegInput) {
       // Not yet cached, must download
-      const inner = await innertube();
+      const inner = this.innertubeManager.get();
       const info = await inner.getInfo(song.url);
       format = info.chooseFormat({});
       debug('Using format', format);
+
+      // Workaround for when url isn't present for whatever reason
+      if (!format.url && format.signature_cipher) {
+        format.url = inner.session.player?.decipher(undefined, format.signature_cipher);
+      }
+
       if (!format.url) {
         throw new Error('No URL found for format.');
       }
@@ -653,7 +664,13 @@ export default class {
     }
   }
 
-  private async createReadStream(options: {url: string; cacheKey: string; ffmpegInputOptions?: string[]; cache?: boolean; volumeAdjustment?: string}): Promise<Readable> {
+  private async createReadStream(options: {
+    url: string;
+    cacheKey: string;
+    ffmpegInputOptions?: string[];
+    cache?: boolean;
+    volumeAdjustment?: string;
+  }): Promise<Readable> {
     return new Promise((resolve, reject) => {
       const capacitor = new WriteStream();
       if (options?.cache) {

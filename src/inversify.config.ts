@@ -8,6 +8,7 @@ import ConfigProvider from './services/config.js';
 
 // Managers
 import PlayerManager from './managers/player.js';
+import InnertubeManager from './managers/innertube.js';
 
 // Services
 import AddQueryToQueue from './services/add-query-to-queue.js';
@@ -58,6 +59,7 @@ container.bind<Client>(TYPES.Client).toConstantValue(new Client({intents}));
 
 // Managers
 container.bind<PlayerManager>(TYPES.Managers.Player).to(PlayerManager).inSingletonScope();
+container.bind<InnertubeManager>(TYPES.Managers.Innertube).to(InnertubeManager).inSingletonScope();
 
 // Config values
 container.bind(TYPES.Config).toConstantValue(new ConfigProvider());
