@@ -1,4 +1,4 @@
-FROM node:18-bullseye-slim AS base
+FROM node:22-bookworm-slim AS base
 
 # openssl will be a required package if base is updated to 18.16+ due to node:*-slim base distro change
 # https://github.com/prisma/prisma/issues/19729#issuecomment-1591270599
@@ -17,6 +17,16 @@ RUN apt-get update \
 FROM base AS dependencies
 
 WORKDIR /usr/app
+
+# Add Python and build tools to compile native modules
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y \
+    python3 \
+    python-is-python3 \
+    build-essential \
+    && apt-get autoclean \
+    && apt-get autoremove \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY package.json .
 COPY yarn.lock .
