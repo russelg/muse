@@ -288,12 +288,15 @@ export default class {
     this.stopTrackingPosition();
   }
 
-  async forward(skip: number): Promise<void> {
+async forward(skip: number): Promise<void> {
     this.manualForward(skip);
 
     try {
       if (this.getCurrent() && this.status !== STATUS.PAUSED) {
+        let oldStatus = this.status; // NEW
+        this.status = STATUS.IDLE; // NEW
         await this.play();
+        this.status = oldStatus; // NEW
       } else {
         this.status = STATUS.IDLE;
         this.audioPlayer?.stop(true);
