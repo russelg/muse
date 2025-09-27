@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.15.1] - 2025-09-28
+
 ### Fixed
 - Github action updates
 
@@ -419,7 +421,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial release
 
-[unreleased]: https://github.com/russelg/muse/compare/v2.15.0...HEAD
+[unreleased]: https://github.com/russelg/muse/compare/v2.15.1...HEAD
+[2.15.1]: https://github.com/russelg/muse/compare/v2.15.0...v2.15.1
 [2.15.0]: https://github.com/russelg/muse/compare/v2.14.0...v2.15.0
 [2.14.0]: https://github.com/russelg/muse/compare/v2.13.5...v2.14.0
 [2.13.5]: https://github.com/russelg/muse/compare/v2.13.4...v2.13.5
