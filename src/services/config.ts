@@ -18,7 +18,8 @@ const CONFIG_MAP = {
   SOUNDCLOUD_OAUTH_TOKEN: process.env.SOUNDCLOUD_OAUTH_TOKEN,
   WEBSERVER_PORT: process.env.WEBSERVER_PORT ?? 80,
   WEBSERVER_PASSWORD: process.env.WEBSERVER_PASSWORD ?? '',
-  HTTP_PROXY: process.env.HTTP_PROXY,
+  HTTP_PROXY: process.env.HTTP_PROXY ?? '',
+  YTDLP_PATH: process.env.YTDLP_PATH ?? 'yt-dlp',
   REGISTER_COMMANDS_ON_BOT: process.env.REGISTER_COMMANDS_ON_BOT === 'true',
   DATA_DIR,
   CACHE_DIR: path.join(DATA_DIR, 'cache'),
@@ -46,6 +47,7 @@ export default class Config {
   readonly WEBSERVER_PORT!: number;
   readonly WEBSERVER_PASSWORD!: string;
   readonly HTTP_PROXY!: string;
+  readonly YTDLP_PATH!: string;
   readonly YOUTUBE_API_KEY!: string;
   readonly SPOTIFY_CLIENT_ID!: string;
   readonly SPOTIFY_CLIENT_SECRET!: string;
