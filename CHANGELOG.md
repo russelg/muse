@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.15.0] - 2025-09-28
+
 ### Added
 - Use yt-dlp to get playback URLs
 - New `/random` command to queue songs randomly from the cache, when youtube is not working.
@@ -414,7 +416,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial release
 
-[unreleased]: https://github.com/russelg/muse/compare/v2.14.0...HEAD
+[unreleased]: https://github.com/russelg/muse/compare/v2.15.0...HEAD
+[2.15.0]: https://github.com/russelg/muse/compare/v2.14.0...v2.15.0
 [2.14.0]: https://github.com/russelg/muse/compare/v2.13.5...v2.14.0
 [2.13.5]: https://github.com/russelg/muse/compare/v2.13.4...v2.13.5
 [2.13.4]: https://github.com/russelg/muse/compare/v2.13.3...v2.13.4
