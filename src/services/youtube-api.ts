@@ -86,7 +86,7 @@ export default class {
     ));
 
     if (!result) {
-      throw new Error('No video found.');
+      return [];
     }
 
     let firstVideo: Video | undefined;
@@ -99,7 +99,7 @@ export default class {
     }
 
     if (!firstVideo) {
-      throw new Error('No video found.');
+      return [];
     }
 
     return this.getVideo(firstVideo.url, shouldSplitChapters);

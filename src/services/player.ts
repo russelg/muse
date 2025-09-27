@@ -470,16 +470,16 @@ export default class {
 
     if (!ffmpegInput) {
       // Not yet cached, must download
-      let info = await ytdl.getInfo(song.url, {playerClients: ['IOS', 'WEB_CREATOR'], agent});
+      let info = await ytdl.getInfo(song.url, {agent});
       debug('Info', info);
 
       if (info.formats.length === 0) {
         debug('Failed to find formats for song, trying again...');
-        info = await ytdl.getInfo(song.url, {playerClients: ['IOS', 'WEB_CREATOR'], agent});
+        info = await ytdl.getInfo(song.url, {agent});
 
         if (info.formats.length === 0) {
           debug('Failed to find formats for song, trying again without agent...');
-          info = await ytdl.getInfo(song.url, {playerClients: ['IOS', 'WEB_CREATOR']});
+          info = await ytdl.getInfo(song.url);
 
           if (info.formats.length === 0) {
             throw new Error('no formats found for song... try another song or try again');
@@ -494,6 +494,10 @@ export default class {
       format = info.formats.find(filter);
 
       const nextBestFormat = (formats: Array<ytdl.videoFormat | undefined>): ytdl.videoFormat | undefined => {
+        if (formats.length < 1) {
+          return undefined;
+        }
+
         if (formats[0]?.isLive) {
           formats = formats.sort((a, b) => (b as unknown as {audioBitrate: number}).audioBitrate - (a as unknown as {
             audioBitrate: number;
