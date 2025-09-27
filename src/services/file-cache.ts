@@ -1,4 +1,4 @@
-import {promises as fs, createWriteStream} from 'fs';
+import {createWriteStream, promises as fs} from 'fs';
 import path from 'path';
 import {inject, injectable} from 'inversify';
 import {TYPES} from '../types.js';
@@ -101,6 +101,47 @@ export default class FileCacheProvider {
   async cleanup() {
     await this.removeOrphans();
     await this.evictOldestIfNecessary();
+  }
+
+  /**
+   * Returns x random cached files
+   * @param count number of random files to return
+   * @returns array of random FileCache entries
+   */
+  async getRandomFiles(count: number): Promise<FileCache[]> {
+    // Get total count of cached files
+    const totalCount = await prisma.fileCache.count();
+
+    if (totalCount === 0) {
+      return [];
+    }
+
+    // Ensure we don't request more files than exist
+    const actualCount = Math.min(count, totalCount);
+
+    // Generate random offsets and fetch files
+    const randomFiles: FileCache[] = [];
+    const usedOffsets = new Set<number>();
+
+    while (randomFiles.length < actualCount) {
+      const randomOffset = Math.floor(Math.random() * totalCount);
+
+      if (!usedOffsets.has(randomOffset)) {
+        usedOffsets.add(randomOffset);
+
+        // eslint-disable-next-line no-await-in-loop
+        const file = await prisma.fileCache.findFirst({
+          skip: randomOffset,
+          take: 1,
+        });
+
+        if (file) {
+          randomFiles.push(file);
+        }
+      }
+    }
+
+    return randomFiles;
   }
 
   private async evictOldestIfNecessary() {

@@ -1,7 +1,7 @@
 import {inject, injectable} from 'inversify';
 import PQueue from 'p-queue';
 import Soundcloud, {SoundcloudTrackV2} from 'soundcloud.ts';
-import {SongMetadata, QueuedPlaylist, MediaSource} from './player.js';
+import {MediaSource, QueuedPlaylist, SongMetadata} from './player.js';
 import {TYPES} from '../types.js';
 import KeyValueCacheProvider from './key-value-cache.js';
 import {ONE_HOUR_IN_SECONDS, ONE_MINUTE_IN_SECONDS} from '../utils/constants.js';

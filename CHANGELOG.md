@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Use yt-dlp to get playback URLs
+- New `/random` command to queue songs randomly from the cache, when youtube is not working.
 
 ## [2.14.0] - 2025-01-20
 

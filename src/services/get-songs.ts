@@ -1,22 +1,23 @@
 import {inject, injectable} from 'inversify';
 import * as spotifyURI from 'spotify-uri';
-import {SongMetadata, QueuedPlaylist, MediaSource} from './player.js';
+import {MediaSource, QueuedPlaylist, SongMetadata} from './player.js';
 import {TYPES} from '../types.js';
 import ffmpeg from 'fluent-ffmpeg';
 import YoutubeAPI from './youtube-api.js';
 import SpotifyAPI, {SpotifyTrack} from './spotify-api.js';
 import SoundcloudAPI from './soundcloud-api.js';
+import FileCacheProvider from './file-cache.js';
+import {spawn} from 'child_process';
+import {parseTime} from '../utils/time.js';
+import debug from '../utils/debug.js';
 
 @injectable()
 export default class {
-  private readonly youtubeAPI: YoutubeAPI;
-  private readonly spotifyAPI: SpotifyAPI;
-  private readonly soundcloudAPI: SoundcloudAPI;
-
-  constructor(@inject(TYPES.Services.YoutubeAPI) youtubeAPI: YoutubeAPI, @inject(TYPES.Services.SpotifyAPI) spotifyAPI: SpotifyAPI, @inject(TYPES.Services.SoundCloudAPI) soundcloudAPI: SoundcloudAPI) {
-    this.youtubeAPI = youtubeAPI;
-    this.spotifyAPI = spotifyAPI;
-    this.soundcloudAPI = soundcloudAPI;
+  constructor(@inject(TYPES.Services.YoutubeAPI) private readonly youtubeAPI: YoutubeAPI,
+    @inject(TYPES.Services.SpotifyAPI) private readonly spotifyAPI: SpotifyAPI,
+    @inject(TYPES.Services.SoundCloudAPI) private readonly soundcloudAPI: SoundcloudAPI,
+    @inject(TYPES.FileCache) private readonly fileCacheProvider: FileCacheProvider,
+  ) {
   }
 
   async youtubeVideoSearch(query: string, shouldSplitChapters: boolean): Promise<SongMetadata[]> {
@@ -45,6 +46,67 @@ export default class {
 
   async soundcloudArtist(listId: string): Promise<SongMetadata[]> {
     return this.soundcloudAPI.getArtist(listId);
+  }
+
+  async cacheSource(query: string) {
+    return Promise.all(query.split(';').map(async q => {
+      const url = q.replace('cache::', '');
+      const path = await this.fileCacheProvider.getPathFor(url);
+
+      if (!path) {
+        throw new Error(`Cache file "${url}" not found`);
+      }
+
+      const length = await this.getCacheFileDuration(path);
+      return {
+        url,
+        source: MediaSource.Cache,
+        isLive: false,
+        title: `Cached Song (${url.substring(0, 8)})`,
+        artist: 'Unknown Artist',
+        length,
+        offset: 0,
+        playlist: null,
+        thumbnailUrl: null,
+      };
+    }));
+  }
+
+  async getCacheFileDuration(path: string) {
+    return new Promise<number>(resolve => {
+      const ffmpegTime = spawn('ffmpeg', ['-i', path, '-f', 'null', '/dev/null']);
+
+      let stderr = '';
+      ffmpegTime.stderr.on('data', (data: Buffer) => {
+        stderr += data.toString();
+      });
+
+      ffmpegTime.on('close', (code: number) => {
+        if (code === 0) {
+          try {
+            // The regex pattern equivalent to [0-9]{1}:[0-9]{2}:[0-9]{2}
+            const pattern = /[0-9]{1}:[0-9]{2}:[0-9]{2}/g;
+
+            // Get all matches
+            const matches = stderr.match(pattern);
+
+            // Return the last match or null if no matches found
+            resolve(matches ? parseTime(matches[matches.length - 1]) ?? 0 : 0);
+          } catch (parseError: unknown) {
+            debug(`Failed to parse ffmpeg output: ${String(parseError)}`);
+            resolve(0);
+          }
+        } else {
+          debug(`ffmpeg failed with code ${code}: ${stderr}`);
+          resolve(0);
+        }
+      });
+
+      ffmpegTime.on('error', (error: Error) => {
+        debug(`Failed to spawn ffmpeg: ${error.message}`);
+        resolve(0);
+      });
+    });
   }
 
   async spotifySource(url: string, playlistLimit: number, shouldSplitChapters: boolean): Promise<[SongMetadata[], number, number]> {

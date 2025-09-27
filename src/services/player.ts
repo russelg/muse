@@ -31,6 +31,7 @@ export enum MediaSource {
   Youtube,
   HLS,
   SoundCloud,
+  Cache,
 }
 
 export interface QueuedPlaylist {
@@ -562,7 +563,13 @@ export default class {
 
     let format: VideoFormat | undefined;
 
-    ffmpegInput = await this.fileCache.getPathFor(this.getHashForCache(song.url));
+    ffmpegInput = await this.fileCache.getPathFor(song.source === MediaSource.Cache
+      ? song.url
+      : this.getHashForCache(song.url));
+
+    if (!ffmpegInput && song.source === MediaSource.Cache) {
+      throw new Error(`Cache file ${song.url} not found`);
+    }
 
     if (!ffmpegInput) {
       // Not yet cached, must download

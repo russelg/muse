@@ -1,4 +1,4 @@
-/* eslint-disable complexity */
+/* eslint-disable complexity,max-depth */
 import {ChatInputCommandInteraction, Client, GuildMember, VoiceChannel} from 'discord.js';
 import {URL} from 'node:url';
 import {inject, injectable} from 'inversify';
@@ -82,82 +82,86 @@ export default class AddQueryToQueue {
     let newSongs: SongMetadata[] = [];
     let extraMsg = '';
 
-    // Test if it's a complete URL
-    try {
-      const url = new URL(query);
+    if (query.includes('cache::')) {
+      newSongs = await this.getSongs.cacheSource(query);
+    } else {
+      // Test if it's a complete URL
+      try {
+        const url = new URL(query);
 
-      const YOUTUBE_HOSTS = [
-        'www.youtube.com',
-        'youtu.be',
-        'youtube.com',
-        'music.youtube.com',
-        'www.music.youtube.com',
-      ];
+        const YOUTUBE_HOSTS = [
+          'www.youtube.com',
+          'youtu.be',
+          'youtube.com',
+          'music.youtube.com',
+          'www.music.youtube.com',
+        ];
 
-      if (YOUTUBE_HOSTS.includes(url.host)) {
-        // YouTube source
-        if (url.searchParams.get('list')) {
-          // YouTube playlist
-          newSongs.push(...await this.getSongs.youtubePlaylist(url.searchParams.get('list')!, shouldSplitChapters));
-        } else {
-          const songs = await this.getSongs.youtubeVideo(url.href, shouldSplitChapters);
+        if (YOUTUBE_HOSTS.includes(url.host)) {
+          // YouTube source
+          if (url.searchParams.get('list')) {
+            // YouTube playlist
+            newSongs.push(...await this.getSongs.youtubePlaylist(url.searchParams.get('list')!, shouldSplitChapters));
+          } else {
+            const songs = await this.getSongs.youtubeVideo(url.href, shouldSplitChapters);
 
-          if (songs) {
+            if (songs) {
+              newSongs.push(...songs);
+            } else {
+              throw new Error('that doesn\'t exist');
+            }
+          }
+        } else if (url.protocol === 'spotify:' || url.host === 'open.spotify.com') {
+          const [convertedSongs, nSongsNotFound, totalSongs] = await this.getSongs.spotifySource(query, playlistLimit, shouldSplitChapters);
+
+          if (totalSongs > playlistLimit) {
+            extraMsg = `a random sample of ${playlistLimit} songs was taken`;
+          }
+
+          if (totalSongs > playlistLimit && nSongsNotFound !== 0) {
+            extraMsg += ' and ';
+          }
+
+          if (nSongsNotFound !== 0) {
+            if (nSongsNotFound === 1) {
+              extraMsg += '1 song was not found';
+            } else {
+              extraMsg += `${nSongsNotFound.toString()} songs were not found`;
+            }
+          }
+
+          newSongs.push(...convertedSongs);
+        } else if (url.host === 'soundcloud.com') {
+          if (url.pathname.includes('/sets/')) {
+            const songs = await this.getSongs.soundcloudPlaylist(url.href);
             newSongs.push(...songs);
+          } else {
+            const songs = await this.getSongs.soundcloudVideo(url.href);
+
+            if (songs) {
+              newSongs.push(...songs);
+            } else {
+              throw new Error('that doesn\'t exist');
+            }
+          }
+        } else {
+          const song = await this.getSongs.httpLiveStream(query);
+
+          if (song) {
+            newSongs.push(song);
           } else {
             throw new Error('that doesn\'t exist');
           }
         }
-      } else if (url.protocol === 'spotify:' || url.host === 'open.spotify.com') {
-        const [convertedSongs, nSongsNotFound, totalSongs] = await this.getSongs.spotifySource(query, playlistLimit, shouldSplitChapters);
+      } catch (_: unknown) {
+        // Not a URL, must search YouTube
+        const songs = await this.getSongs.youtubeVideoSearch(query, shouldSplitChapters);
 
-        if (totalSongs > playlistLimit) {
-          extraMsg = `a random sample of ${playlistLimit} songs was taken`;
-        }
-
-        if (totalSongs > playlistLimit && nSongsNotFound !== 0) {
-          extraMsg += ' and ';
-        }
-
-        if (nSongsNotFound !== 0) {
-          if (nSongsNotFound === 1) {
-            extraMsg += '1 song was not found';
-          } else {
-            extraMsg += `${nSongsNotFound.toString()} songs were not found`;
-          }
-        }
-
-        newSongs.push(...convertedSongs);
-      } else if (url.host === 'soundcloud.com') {
-        if (url.pathname.includes('/sets/')) {
-          const songs = await this.getSongs.soundcloudPlaylist(url.href);
+        if (songs) {
           newSongs.push(...songs);
-        } else {
-          const songs = await this.getSongs.soundcloudVideo(url.href);
-
-          if (songs) {
-            newSongs.push(...songs);
-          } else {
-            throw new Error('that doesn\'t exist');
-          }
-        }
-      } else {
-        const song = await this.getSongs.httpLiveStream(query);
-
-        if (song) {
-          newSongs.push(song);
         } else {
           throw new Error('that doesn\'t exist');
         }
-      }
-    } catch (_: unknown) {
-      // Not a URL, must search YouTube
-      const songs = await this.getSongs.youtubeVideoSearch(query, shouldSplitChapters);
-
-      if (songs) {
-        newSongs.push(...songs);
-      } else {
-        throw new Error('that doesn\'t exist');
       }
     }
 
@@ -279,9 +283,9 @@ export default class AddQueryToQueue {
 
   private async skipNonMusicSegments(song: SongMetadata) {
     if (!this.sponsorBlock
-          || (this.sponsorBlockDisabledUntil && new Date() < this.sponsorBlockDisabledUntil)
-          || song.source !== MediaSource.Youtube
-          || !song.url) {
+      || (this.sponsorBlockDisabledUntil && new Date() < this.sponsorBlockDisabledUntil)
+      || song.source !== MediaSource.Youtube
+      || !song.url) {
       return song;
     }
 

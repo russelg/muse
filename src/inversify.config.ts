@@ -33,6 +33,7 @@ import Next from './commands/next.js';
 import NowPlaying from './commands/now-playing.js';
 import Pause from './commands/pause.js';
 import Play from './commands/play.js';
+import Random from './commands/random.js';
 import QueueCommand from './commands/queue.js';
 import Remove from './commands/remove.js';
 import Replay from './commands/replay.js';
@@ -83,6 +84,7 @@ container.bind<SoundcloudAPI>(TYPES.Services.SoundCloudAPI).to(SoundcloudAPI).in
   NowPlaying,
   Pause,
   Play,
+  Random,
   QueueCommand,
   Remove,
   Replay,
