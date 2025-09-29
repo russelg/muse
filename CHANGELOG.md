@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.15.2] - 2025-09-29
+
 ### Fixed
 - Attempt to fix skip/next breaking queue.
 
@@ -424,7 +426,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial release
 
-[unreleased]: https://github.com/russelg/muse/compare/v2.15.1...HEAD
+[unreleased]: https://github.com/russelg/muse/compare/v2.15.2...HEAD
+[2.15.2]: https://github.com/russelg/muse/compare/v2.15.1...v2.15.2
 [2.15.1]: https://github.com/russelg/muse/compare/v2.15.0...v2.15.1
 [2.15.0]: https://github.com/russelg/muse/compare/v2.14.0...v2.15.0
 [2.14.0]: https://github.com/russelg/muse/compare/v2.13.5...v2.14.0
