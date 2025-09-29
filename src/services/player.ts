@@ -195,8 +195,9 @@ export default class {
       to = currentSong.length + currentSong.offset;
     }
 
+    debug('seek: getting stream');
     const stream = await this.getStream(currentSong, {seek: realPositionSeconds, to});
-    this.audioPlayer = createAudioPlayer({
+    this.audioPlayer = this.audioPlayer ?? createAudioPlayer({
       behaviors: {
         // Needs to be somewhat high for livestreams
         maxMissedFrames: 50,
@@ -237,6 +238,7 @@ export default class {
 
     // Resume from paused state
     if (this.status === STATUS.PAUSED && currentSong.url === this.nowPlaying?.url) {
+      debug('resume from paused state');
       if (this.audioPlayer) {
         this.audioPlayer.unpause();
         this.status = STATUS.PLAYING;
@@ -246,6 +248,7 @@ export default class {
 
       // Was disconnected, need to recreate stream
       if (!currentSong.isLive) {
+        debug('seeking to previous position');
         return this.seek(this.getPosition());
       }
     }
@@ -258,8 +261,9 @@ export default class {
         to = currentSong.length + currentSong.offset;
       }
 
+      debug('play: getting stream');
       const stream = await this.getStream(currentSong, {seek: positionSeconds, to});
-      this.audioPlayer = createAudioPlayer({
+      this.audioPlayer = this.audioPlayer ?? createAudioPlayer({
         behaviors: {
           // Needs to be somewhat high for livestreams
           maxMissedFrames: 50,
@@ -311,9 +315,12 @@ export default class {
     this.manualForward(skip);
 
     try {
-      if (this.getCurrent() && this.status !== STATUS.PAUSED) {
+      const currentSong = this.getCurrent();
+      if (currentSong && this.status !== STATUS.PAUSED) {
+        debug('forward; has song and not paused... play()', currentSong, this.status);
         await this.play();
       } else {
+        debug('forward; no song or is paused', currentSong, this.status);
         this.status = STATUS.IDLE;
         this.audioPlayer?.stop(true);
 
@@ -331,6 +338,7 @@ export default class {
         }
       }
     } catch (error: unknown) {
+      debug('forward; error', error);
       this.queuePosition--;
       throw error;
     }
@@ -342,6 +350,7 @@ export default class {
 
   manualForward(skip: number): void {
     if (this.canGoForward(skip)) {
+      debug(`canGoForward; advancing queuePosition by ${skip} (previously ${this.queuePosition}`);
       this.queuePosition += skip;
       this.positionInSeconds = 0;
       this.stopTrackingPosition();
@@ -574,8 +583,6 @@ export default class {
     if (!ffmpegInput) {
       // Not yet cached, must download
       const info = await this.getYouTubeInfo(song.url);
-      debug('Info', info);
-
       const {formats} = info;
 
       // Look for the ideal format (opus codec, webm container, 48kHz)
@@ -613,8 +620,6 @@ export default class {
       };
 
       if (!format) {
-        debug('Formats', info.formats);
-
         format = nextBestFormat(info.formats);
 
         if (!format) {
@@ -693,7 +698,7 @@ export default class {
       return;
     }
 
-    if (this.audioPlayer.listeners('stateChange').length === 0) {
+    if (this.audioPlayer.listeners(AudioPlayerStatus.Idle).length === 0) {
       this.audioPlayer.on(AudioPlayerStatus.Idle, this.onAudioPlayerIdle.bind(this));
     }
   }
@@ -702,7 +707,7 @@ export default class {
     this.disconnect();
   }
 
-  private async onAudioPlayerIdle(_oldState: AudioPlayerState, newState: AudioPlayerState): Promise<void> {
+  private async onAudioPlayerIdle(oldState: AudioPlayerState, newState: AudioPlayerState): Promise<void> {
     // Automatically advance queued song at end
     if (this.loopCurrentSong && newState.status === AudioPlayerStatus.Idle && this.status === STATUS.PLAYING) {
       await this.seek(0);
@@ -720,7 +725,8 @@ export default class {
       }
     }
 
-    if (newState.status === AudioPlayerStatus.Idle && this.status === STATUS.PLAYING) {
+    if (newState.status === AudioPlayerStatus.Idle && oldState.status !== AudioPlayerStatus.Idle && this.status === STATUS.PLAYING) {
+      debug('changing to idle while playing...');
       await this.forward(1);
       // Auto announce the next song if configured to
       const settings = await getGuildSettings(this.guildId);
