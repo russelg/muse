@@ -4,7 +4,7 @@ import hasha from 'hasha';
 import {WriteStream} from 'fs-capacitor';
 import ffmpeg from 'fluent-ffmpeg';
 import shuffle from 'array-shuffle';
-import {ChildProcessWithoutNullStreams, spawn} from 'child_process';
+import {ChildProcess, ChildProcessWithoutNullStreams, spawn} from 'child_process';
 import {
   AudioPlayer,
   AudioPlayerState,
@@ -86,6 +86,12 @@ export default class {
   private nowPlaying: QueuedSong | null = null;
   private playPositionInterval: NodeJS.Timeout | undefined;
   private lastSongURL = '';
+  private activeSourceProcess: ChildProcessWithoutNullStreams | null = null;
+  private activeFfmpegCommand: ffmpeg.FfmpegCommand | null = null;
+  private activeReadable: Readable | null = null;
+  private playbackSessionId = 0;
+  private activeFfmpegPid: number | null = null;
+  private activeFfmpegProcess: ChildProcess | null = null;
 
   private positionInSeconds = 0;
   private readonly fileCache: FileCacheProvider;
@@ -132,6 +138,8 @@ export default class {
   }
 
   disconnect(): void {
+    this.stopActivePlayback();
+
     if (this.voiceConnection) {
       if (this.status === STATUS.PLAYING) {
         this.pause();
@@ -261,6 +269,10 @@ export default class {
         this.lastSongURL = currentSong.url;
       }
     } catch (error: unknown) {
+      if (this.status === STATUS.IDLE || (error instanceof Error && error.message === 'Playback stopped.')) {
+        return;
+      }
+
       await this.forward(1);
 
       if ((error as {statusCode: number}).statusCode === 410 && currentSong) {
@@ -425,6 +437,8 @@ export default class {
   }
 
   stop(): void {
+    this.status = STATUS.IDLE;
+    this.stopActivePlayback();
     this.disconnect();
     this.queuePosition = 0;
     this.queue = [];
@@ -518,13 +532,20 @@ export default class {
       this.audioPlayer?.stop(true);
     }
 
+    this.stopActivePlayback();
+    const sessionId = this.playbackSessionId;
+
     if (song.source === MediaSource.HLS) {
-      return this.createReadStream({url: song.url, cacheKey: song.url});
+      const stream = await this.createReadStream({url: song.url, cacheKey: song.url, playbackSessionId: sessionId});
+      this.throwIfStaleSession(sessionId, stream);
+      return stream;
     }
 
     if (song.source === MediaSource.SoundCloud) {
       const scSong = await this.soundcloud.util.streamTrack(song.url) as Readable;
-      return this.createReadStream({url: scSong, cacheKey: song.url});
+      const stream = await this.createReadStream({url: scSong, cacheKey: song.url, playbackSessionId: sessionId});
+      this.throwIfStaleSession(sessionId, stream);
+      return stream;
     }
 
     let ffmpegInput: string | Readable | null;
@@ -561,12 +582,22 @@ export default class {
         song.url,
       ];
 
-      ytDlpProcess = spawn(this.config.YTDLP_PATH, ytDlpArgs);
+      ytDlpProcess = spawn(this.config.YTDLP_PATH, ytDlpArgs, {detached: true});
+      this.activeSourceProcess = ytDlpProcess;
       ytDlpProcess.stderr.on('data', (data: Buffer) => {
         debug(`yt-dlp stderr: ${data.toString()}`);
       });
       ytDlpProcess.on('error', error => {
+        if (this.activeSourceProcess === ytDlpProcess) {
+          this.activeSourceProcess = null;
+        }
+
         debug(`yt-dlp spawn error: ${error.message}`);
+      });
+      ytDlpProcess.on('close', () => {
+        if (this.activeSourceProcess === ytDlpProcess) {
+          this.activeSourceProcess = null;
+        }
       });
 
       ffmpegInput = ytDlpProcess.stdout;
@@ -580,14 +611,17 @@ export default class {
       ffmpegInputOptions.push('-to', options.to.toString());
     }
 
-    return this.createReadStream({
+    const stream = await this.createReadStream({
       url: ffmpegInput,
       cacheKey: song.url,
       ffmpegInputOptions,
       cache: shouldCacheVideo,
       proxy: this.config.HTTP_PROXY,
       sourceProcess: ytDlpProcess ?? undefined,
+      playbackSessionId: sessionId,
     });
+    this.throwIfStaleSession(sessionId, stream);
+    return stream;
   }
 
   private startTrackingPosition(initalPosition?: number): void {
@@ -610,6 +644,73 @@ export default class {
     }
   }
 
+  private stopActiveSourceProcess(): void {
+    if (!this.activeSourceProcess) {
+      return;
+    }
+
+    try {
+      if (this.activeSourceProcess.pid) {
+        this.killProcessGroup(this.activeSourceProcess.pid);
+      } else {
+        this.activeSourceProcess.kill('SIGKILL');
+      }
+    } catch {
+      // Best-effort cleanup; process may already be gone.
+    }
+
+    this.activeSourceProcess = null;
+  }
+
+  private killProcessGroup(pid: number): void {
+    try {
+      process.kill(-pid, 'SIGKILL');
+    } catch {
+      try {
+        process.kill(pid, 'SIGKILL');
+      } catch {
+        // Best-effort cleanup; process may already be gone.
+      }
+    }
+  }
+
+  private stopActivePlayback(): void {
+    this.playbackSessionId++;
+    if (this.activeReadable) {
+      this.activeReadable.destroy();
+      this.activeReadable = null;
+    }
+
+    if (this.activeFfmpegCommand) {
+      this.activeFfmpegCommand.kill('SIGKILL');
+      this.activeFfmpegCommand = null;
+    }
+
+    if (this.activeFfmpegProcess) {
+      try {
+        this.activeFfmpegProcess.kill('SIGKILL');
+      } catch {
+        // Best-effort cleanup; process may already be gone.
+      } finally {
+        this.activeFfmpegProcess = null;
+      }
+    }
+
+    if (this.activeFfmpegPid) {
+      this.killProcessGroup(this.activeFfmpegPid);
+      this.activeFfmpegPid = null;
+    }
+
+    this.stopActiveSourceProcess();
+  }
+
+  private throwIfStaleSession(sessionId: number, stream: Readable): void {
+    if (sessionId !== this.playbackSessionId) {
+      stream.destroy();
+      throw new Error('Playback stopped.');
+    }
+  }
+
   private attachListeners(): void {
     if (!this.voiceConnection) {
       return;
@@ -625,6 +726,10 @@ export default class {
 
     if (this.audioPlayer.listeners(AudioPlayerStatus.Idle).length === 0) {
       this.audioPlayer.on(AudioPlayerStatus.Idle, this.onAudioPlayerIdle.bind(this));
+    }
+
+    if (this.audioPlayer.listeners('error').length === 0) {
+      this.audioPlayer.on('error', this.onAudioPlayerError.bind(this));
     }
   }
 
@@ -664,6 +769,16 @@ export default class {
     }
   }
 
+  private onAudioPlayerError(error: Error): void {
+    const err = error as Error & {code?: string};
+    if (err.code === 'ERR_STREAM_PREMATURE_CLOSE') {
+      // Expected when we tear down the stream during skips/stops.
+      return;
+    }
+
+    debug('audio player error', error);
+  }
+
   private async createReadStream(options: {
     url: string | Readable;
     cacheKey: string;
@@ -672,6 +787,7 @@ export default class {
     cache?: boolean;
     volumeAdjustment?: string;
     sourceProcess?: ChildProcessWithoutNullStreams;
+    playbackSessionId?: number;
   }): Promise<Readable> {
     return new Promise((resolve, reject) => {
       const capacitor = new WriteStream();
@@ -685,6 +801,30 @@ export default class {
       let hasReturnedStreamClosed = false;
 
       let stream = ffmpeg(options.url);
+      this.activeReadable = returnedStream;
+      this.activeFfmpegCommand = stream;
+      if (options.playbackSessionId !== undefined && options.playbackSessionId !== this.playbackSessionId) {
+        returnedStream.destroy();
+        stream.kill('SIGKILL');
+        if (this.activeReadable === returnedStream) {
+          this.activeReadable = null;
+        }
+
+        if (this.activeFfmpegCommand === stream) {
+          this.activeFfmpegCommand = null;
+        }
+
+        if (this.activeFfmpegProcess !== null) {
+          this.activeFfmpegProcess = null;
+        }
+
+        if (this.activeFfmpegPid !== null) {
+          this.activeFfmpegPid = null;
+        }
+
+        reject(new Error('Playback stopped.'));
+        return;
+      }
 
       if (options?.proxy) {
         stream = stream.withOption(['-http_proxy', options.proxy]);
@@ -696,7 +836,11 @@ export default class {
         .outputFormat('webm')
         .on('error', error => {
           if (options.sourceProcess) {
-            options.sourceProcess.kill('SIGKILL');
+            if (options.sourceProcess.pid) {
+              this.killProcessGroup(options.sourceProcess.pid);
+            } else {
+              options.sourceProcess.kill('SIGKILL');
+            }
           }
 
           if (!hasReturnedStreamClosed) {
@@ -705,6 +849,13 @@ export default class {
         })
         .on('start', command => {
           debug(`Spawned ffmpeg with ${command}`);
+          const {ffmpegProc} = stream as {ffmpegProc?: ChildProcess};
+          if (ffmpegProc) {
+            this.activeFfmpegProcess = ffmpegProc;
+            if (ffmpegProc.pid) {
+              this.activeFfmpegPid = ffmpegProc.pid;
+            }
+          }
         });
 
       stream.pipe(capacitor);
@@ -715,7 +866,27 @@ export default class {
         }
 
         if (options.sourceProcess) {
-          options.sourceProcess.kill('SIGKILL');
+          if (options.sourceProcess.pid) {
+            this.killProcessGroup(options.sourceProcess.pid);
+          } else {
+            options.sourceProcess.kill('SIGKILL');
+          }
+        }
+
+        if (this.activeReadable === returnedStream) {
+          this.activeReadable = null;
+        }
+
+        if (this.activeFfmpegCommand === stream) {
+          this.activeFfmpegCommand = null;
+        }
+
+        if (this.activeFfmpegProcess !== null) {
+          this.activeFfmpegProcess = null;
+        }
+
+        if (this.activeFfmpegPid !== null) {
+          this.activeFfmpegPid = null;
         }
 
         hasReturnedStreamClosed = true;
