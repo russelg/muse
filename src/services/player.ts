@@ -4,7 +4,7 @@ import hasha from 'hasha';
 import {WriteStream} from 'fs-capacitor';
 import ffmpeg from 'fluent-ffmpeg';
 import shuffle from 'array-shuffle';
-import {spawn} from 'child_process';
+import {ChildProcessWithoutNullStreams, spawn} from 'child_process';
 import {
   AudioPlayer,
   AudioPlayerState,
@@ -63,31 +63,7 @@ export enum STATUS {
   IDLE,
 }
 
-interface VideoFormat {
-  url: string;
-  itag: string | number;
-  codecs?: string;
-  container?: string;
-  audioSampleRate?: string;
-  averageBitrate?: number;
-  bitrate?: string | number;
-  isLive?: boolean;
-  loudnessDb?: number;
-}
-
-interface YtDlpFormat {
-  url?: string;
-  format_id?: string;
-  acodec?: string;
-  vcodec?: string;
-  ext?: string;
-  asr?: number;
-  abr?: number;
-  tbr?: number;
-}
-
 interface YtDlpResponse {
-  formats?: YtDlpFormat[];
   is_live?: boolean;
   duration?: number;
 }
@@ -515,7 +491,6 @@ export default class {
   }
 
   private async getYouTubeInfo(url: string): Promise<{
-    formats: VideoFormat[];
     isLive: boolean;
     lengthSeconds: string;
   }> {
@@ -526,21 +501,7 @@ export default class {
 
     const info = await this.getVideoInfoWithYtDlp(fullUrl);
 
-    const formats: VideoFormat[] = (info.formats ?? []).map((format: YtDlpFormat) => ({
-      url: format.url ?? '',
-      itag: format.format_id ?? '',
-      codecs: format.acodec && format.acodec !== 'none'
-        ? format.acodec
-        : format.vcodec ?? '',
-      container: format.ext ?? '',
-      audioSampleRate: format.asr?.toString(),
-      averageBitrate: format.abr,
-      bitrate: format.tbr,
-      isLive: info.is_live ?? false,
-    }));
-
     return {
-      formats,
       isLive: info.is_live ?? false,
       lengthSeconds: info.duration?.toString() ?? '0',
     };
@@ -566,11 +527,10 @@ export default class {
       return this.createReadStream({url: scSong, cacheKey: song.url});
     }
 
-    let ffmpegInput: string | null;
+    let ffmpegInput: string | Readable | null;
     const ffmpegInputOptions: string[] = [];
     let shouldCacheVideo = false;
-
-    let format: VideoFormat | undefined;
+    let ytDlpProcess: ChildProcessWithoutNullStreams | null = null;
 
     ffmpegInput = await this.fileCache.getPathFor(song.source === MediaSource.Cache
       ? song.url
@@ -583,53 +543,6 @@ export default class {
     if (!ffmpegInput) {
       // Not yet cached, must download
       const info = await this.getYouTubeInfo(song.url);
-      const {formats} = info;
-
-      // Look for the ideal format (opus codec, webm container, 48kHz)
-      const filter = (format: VideoFormat): boolean => format.codecs === 'opus'
-        && format.container === 'webm'
-        && format.audioSampleRate !== undefined
-        && parseInt(format.audioSampleRate, 10) === 48000
-        && Boolean(format.url);
-
-      format = formats.find(filter);
-
-      const nextBestFormat = (formats: VideoFormat[]): VideoFormat | undefined => {
-        if (formats.length < 1) {
-          return undefined;
-        }
-
-        if (formats[0]?.isLive) {
-          formats = formats.sort((a, b) =>
-            (b as unknown as {audioBitrate: number}).audioBitrate
-            - (a as unknown as {audioBitrate: number}).audioBitrate);
-
-          return formats.find(format => [128, 127, 120, 96, 95, 94, 93].includes(parseInt(format.itag as unknown as string, 10)));
-        }
-
-        formats = formats
-          .filter(format => format?.averageBitrate)
-          .sort((a, b) => {
-            if (a && b) {
-              return b.averageBitrate! - a.averageBitrate!;
-            }
-
-            return 0;
-          });
-        return formats.find(format => format && !format.bitrate) ?? formats[0];
-      };
-
-      if (!format) {
-        format = nextBestFormat(info.formats);
-
-        if (!format) {
-          // If still no format is found, throw
-          throw new Error('Can\'t find suitable format.');
-        }
-      }
-
-      debug('Using format', format);
-      ffmpegInput = format.url!;
 
       // Don't cache livestreams or long videos
       shouldCacheVideo = !info.isLive
@@ -638,14 +551,25 @@ export default class {
 
       debug(shouldCacheVideo ? 'Caching video' : 'Not caching video');
 
-      ffmpegInputOptions.push(...[
-        '-reconnect',
-        '1',
-        '-reconnect_streamed',
-        '1',
-        '-reconnect_delay_max',
-        '5',
-      ]);
+      const ytDlpArgs = [
+        '--no-playlist',
+        '--no-warnings',
+        '-f',
+        'bestaudio/best',
+        '-o',
+        '-',
+        song.url,
+      ];
+
+      ytDlpProcess = spawn(this.config.YTDLP_PATH, ytDlpArgs);
+      ytDlpProcess.stderr.on('data', (data: Buffer) => {
+        debug(`yt-dlp stderr: ${data.toString()}`);
+      });
+      ytDlpProcess.on('error', error => {
+        debug(`yt-dlp spawn error: ${error.message}`);
+      });
+
+      ffmpegInput = ytDlpProcess.stdout;
     }
 
     if (options.seek) {
@@ -662,6 +586,7 @@ export default class {
       ffmpegInputOptions,
       cache: shouldCacheVideo,
       proxy: this.config.HTTP_PROXY,
+      sourceProcess: ytDlpProcess ?? undefined,
     });
   }
 
@@ -746,6 +671,7 @@ export default class {
     proxy?: string;
     cache?: boolean;
     volumeAdjustment?: string;
+    sourceProcess?: ChildProcessWithoutNullStreams;
   }): Promise<Readable> {
     return new Promise((resolve, reject) => {
       const capacitor = new WriteStream();
@@ -769,6 +695,10 @@ export default class {
         .audioCodec('libopus')
         .outputFormat('webm')
         .on('error', error => {
+          if (options.sourceProcess) {
+            options.sourceProcess.kill('SIGKILL');
+          }
+
           if (!hasReturnedStreamClosed) {
             reject(error);
           }
@@ -784,8 +714,20 @@ export default class {
           stream.kill('SIGKILL');
         }
 
+        if (options.sourceProcess) {
+          options.sourceProcess.kill('SIGKILL');
+        }
+
         hasReturnedStreamClosed = true;
       });
+
+      if (options.sourceProcess) {
+        options.sourceProcess.on('close', code => {
+          if (code !== 0 && !hasReturnedStreamClosed) {
+            returnedStream.destroy(new Error(`yt-dlp exited with code ${code ?? 'unknown'}`));
+          }
+        });
+      }
 
       resolve(returnedStream);
     });
@@ -811,4 +753,3 @@ export default class {
     this.audioResource?.volume?.setVolume((level ?? this.getVolume()) / 100);
   }
 }
-
