@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Tweak to use yt-dlp to download the content
+
 ## [2.15.2] - 2025-09-29
 
 ### Fixed
