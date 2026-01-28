@@ -566,6 +566,8 @@ export default class {
       const ytDlpArgs = [
         '--no-playlist',
         '--no-warnings',
+        '--js-runtimes',
+        'node',
         '-f',
         'bestaudio/best',
         '-o',
