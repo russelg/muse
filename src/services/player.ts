@@ -87,10 +87,6 @@ export default class {
   private playPositionInterval: NodeJS.Timeout | undefined;
   private lastSongURL = '';
   private activeSourceProcess: ChildProcessWithoutNullStreams | null = null;
-  private activeFfmpegCommand: ffmpeg.FfmpegCommand | null = null;
-  private activeReadable: Readable | null = null;
-  private playbackSessionId = 0;
-  private activeFfmpegPid: number | null = null;
   private activeFfmpegProcess: ChildProcess | null = null;
 
   private positionInSeconds = 0;
@@ -269,7 +265,7 @@ export default class {
         this.lastSongURL = currentSong.url;
       }
     } catch (error: unknown) {
-      if (this.status === STATUS.IDLE || (error instanceof Error && error.message === 'Playback stopped.')) {
+      if (this.status === STATUS.IDLE) {
         return;
       }
 
@@ -533,19 +529,14 @@ export default class {
     }
 
     this.stopActivePlayback();
-    const sessionId = this.playbackSessionId;
 
     if (song.source === MediaSource.HLS) {
-      const stream = await this.createReadStream({url: song.url, cacheKey: song.url, playbackSessionId: sessionId});
-      this.throwIfStaleSession(sessionId, stream);
-      return stream;
+      return this.createReadStream({url: song.url, cacheKey: song.url});
     }
 
     if (song.source === MediaSource.SoundCloud) {
       const scSong = await this.soundcloud.util.streamTrack(song.url) as Readable;
-      const stream = await this.createReadStream({url: scSong, cacheKey: song.url, playbackSessionId: sessionId});
-      this.throwIfStaleSession(sessionId, stream);
-      return stream;
+      return this.createReadStream({url: scSong, cacheKey: song.url});
     }
 
     let ffmpegInput: string | Readable | null;
@@ -611,17 +602,14 @@ export default class {
       ffmpegInputOptions.push('-to', options.to.toString());
     }
 
-    const stream = await this.createReadStream({
+    return this.createReadStream({
       url: ffmpegInput,
       cacheKey: song.url,
       ffmpegInputOptions,
       cache: shouldCacheVideo,
       proxy: this.config.HTTP_PROXY,
       sourceProcess: ytDlpProcess ?? undefined,
-      playbackSessionId: sessionId,
     });
-    this.throwIfStaleSession(sessionId, stream);
-    return stream;
   }
 
   private startTrackingPosition(initalPosition?: number): void {
@@ -645,20 +633,7 @@ export default class {
   }
 
   private stopActiveSourceProcess(): void {
-    if (!this.activeSourceProcess) {
-      return;
-    }
-
-    try {
-      if (this.activeSourceProcess.pid) {
-        this.killProcessGroup(this.activeSourceProcess.pid);
-      } else {
-        this.activeSourceProcess.kill('SIGKILL');
-      }
-    } catch {
-      // Best-effort cleanup; process may already be gone.
-    }
-
+    this.killChildProcess(this.activeSourceProcess);
     this.activeSourceProcess = null;
   }
 
@@ -674,41 +649,27 @@ export default class {
     }
   }
 
-  private stopActivePlayback(): void {
-    this.playbackSessionId++;
-    if (this.activeReadable) {
-      this.activeReadable.destroy();
-      this.activeReadable = null;
+  private killChildProcess(process: ChildProcess | ChildProcessWithoutNullStreams | null): void {
+    if (!process) {
+      return;
     }
 
-    if (this.activeFfmpegCommand) {
-      this.activeFfmpegCommand.kill('SIGKILL');
-      this.activeFfmpegCommand = null;
-    }
-
-    if (this.activeFfmpegProcess) {
-      try {
-        this.activeFfmpegProcess.kill('SIGKILL');
-      } catch {
-        // Best-effort cleanup; process may already be gone.
-      } finally {
-        this.activeFfmpegProcess = null;
+    try {
+      if (process.pid) {
+        this.killProcessGroup(process.pid);
+      } else {
+        process.kill('SIGKILL');
       }
+    } catch {
+      // Best-effort cleanup; process may already be gone.
     }
-
-    if (this.activeFfmpegPid) {
-      this.killProcessGroup(this.activeFfmpegPid);
-      this.activeFfmpegPid = null;
-    }
-
-    this.stopActiveSourceProcess();
   }
 
-  private throwIfStaleSession(sessionId: number, stream: Readable): void {
-    if (sessionId !== this.playbackSessionId) {
-      stream.destroy();
-      throw new Error('Playback stopped.');
-    }
+  private stopActivePlayback(): void {
+    this.killChildProcess(this.activeFfmpegProcess);
+    this.activeFfmpegProcess = null;
+
+    this.stopActiveSourceProcess();
   }
 
   private attachListeners(): void {
@@ -787,7 +748,6 @@ export default class {
     cache?: boolean;
     volumeAdjustment?: string;
     sourceProcess?: ChildProcessWithoutNullStreams;
-    playbackSessionId?: number;
   }): Promise<Readable> {
     return new Promise((resolve, reject) => {
       const capacitor = new WriteStream();
@@ -801,30 +761,6 @@ export default class {
       let hasReturnedStreamClosed = false;
 
       let stream = ffmpeg(options.url);
-      this.activeReadable = returnedStream;
-      this.activeFfmpegCommand = stream;
-      if (options.playbackSessionId !== undefined && options.playbackSessionId !== this.playbackSessionId) {
-        returnedStream.destroy();
-        stream.kill('SIGKILL');
-        if (this.activeReadable === returnedStream) {
-          this.activeReadable = null;
-        }
-
-        if (this.activeFfmpegCommand === stream) {
-          this.activeFfmpegCommand = null;
-        }
-
-        if (this.activeFfmpegProcess !== null) {
-          this.activeFfmpegProcess = null;
-        }
-
-        if (this.activeFfmpegPid !== null) {
-          this.activeFfmpegPid = null;
-        }
-
-        reject(new Error('Playback stopped.'));
-        return;
-      }
 
       if (options?.proxy) {
         stream = stream.withOption(['-http_proxy', options.proxy]);
@@ -835,13 +771,7 @@ export default class {
         .audioCodec('libopus')
         .outputFormat('webm')
         .on('error', error => {
-          if (options.sourceProcess) {
-            if (options.sourceProcess.pid) {
-              this.killProcessGroup(options.sourceProcess.pid);
-            } else {
-              options.sourceProcess.kill('SIGKILL');
-            }
-          }
+          this.killChildProcess(options.sourceProcess ?? null);
 
           if (!hasReturnedStreamClosed) {
             reject(error);
@@ -852,9 +782,6 @@ export default class {
           const {ffmpegProc} = stream as {ffmpegProc?: ChildProcess};
           if (ffmpegProc) {
             this.activeFfmpegProcess = ffmpegProc;
-            if (ffmpegProc.pid) {
-              this.activeFfmpegPid = ffmpegProc.pid;
-            }
           }
         });
 
@@ -865,28 +792,9 @@ export default class {
           stream.kill('SIGKILL');
         }
 
-        if (options.sourceProcess) {
-          if (options.sourceProcess.pid) {
-            this.killProcessGroup(options.sourceProcess.pid);
-          } else {
-            options.sourceProcess.kill('SIGKILL');
-          }
-        }
-
-        if (this.activeReadable === returnedStream) {
-          this.activeReadable = null;
-        }
-
-        if (this.activeFfmpegCommand === stream) {
-          this.activeFfmpegCommand = null;
-        }
-
+        this.killChildProcess(options.sourceProcess ?? null);
         if (this.activeFfmpegProcess !== null) {
           this.activeFfmpegProcess = null;
-        }
-
-        if (this.activeFfmpegPid !== null) {
-          this.activeFfmpegPid = null;
         }
 
         hasReturnedStreamClosed = true;
