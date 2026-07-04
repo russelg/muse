@@ -6,6 +6,7 @@ import Bot from './bot.js';
 import Config from './services/config.js';
 import FileCacheProvider from './services/file-cache.js';
 import prepareYtDlp from './utils/prepare-yt-dlp.js';
+import Api from './api.js';
 
 const bot = container.get<Bot>(TYPES.Bot);
 
@@ -21,6 +22,8 @@ const startBot = async () => {
   await prepareYtDlp(config);
 
   await bot.register();
+
+  container.get<Api>(TYPES.Api).start();
 };
 
 export {startBot};
