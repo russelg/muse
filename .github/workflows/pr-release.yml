@@ -43,7 +43,6 @@ jobs:
         shell: bash
         run: |
           docker load -i /tmp/images/image-linux-amd64.tar
-          docker load -i /tmp/images/image-linux-arm64.tar
 
       - name: Download SHA
         uses: actions/download-artifact@v8
@@ -62,7 +61,6 @@ jobs:
       - name: Push images
         run: |
           docker push ${{ env.REGISTRY_IMAGE }}:${{ env.SHA }}-linux-amd64
-          docker push ${{ env.REGISTRY_IMAGE }}:${{ env.SHA }}-linux-arm64
 
       - name: Download Docker metadata
         uses: actions/download-artifact@v8
@@ -95,7 +93,7 @@ jobs:
       - name: Create manifest list and push
         run: |
           tags="$(jq -cr '.tags | map("-t " + .) | join(" ")' /tmp/metadata/metadata.json)"
-          docker buildx imagetools create ${tags} ${{ env.REGISTRY_IMAGE }}:${{ env.SHA }}-linux-amd64 ${{ env.REGISTRY_IMAGE }}:${{ env.SHA }}-linux-arm64
+          docker buildx imagetools create ${tags} ${{ env.REGISTRY_IMAGE }}:${{ env.SHA }}-linux-amd64
 
       - name: Create comment
         uses: marocchino/sticky-pull-request-comment@v3.0.4
@@ -108,6 +106,6 @@ jobs:
 
             To play around with this PR, pull `${{ env.REGISTRY_IMAGE }}:pr-${{ env.PR_NUMBER }}`.
 
-            Images are available for x86_64 and ARM64.
+            Images are available for x86_64.
 
             > Latest commit: ${{ env.SHA }}
