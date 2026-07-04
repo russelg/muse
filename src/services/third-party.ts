@@ -8,6 +8,7 @@ import debug from '../utils/debug.js';
 @injectable()
 export default class ThirdParty {
   readonly spotify: SpotifyWebApi;
+  readonly soundcloud: Soundcloud;
 
   private spotifyTokenTimerId?: NodeJS.Timeout;
 
@@ -16,6 +17,8 @@ export default class ThirdParty {
       clientId: config.SPOTIFY_CLIENT_ID,
       clientSecret: config.SPOTIFY_CLIENT_SECRET,
     });
+
+    this.soundcloud = new Soundcloud(config.SOUNDCLOUD_CLIENT_ID, config.SOUNDCLOUD_OAUTH_TOKEN);
 
     void this.refreshSpotifyToken();
   }

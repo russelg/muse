@@ -24,6 +24,8 @@ const CONFIG_MAP = {
   DATA_DIR,
   CACHE_DIR: path.join(DATA_DIR, 'cache'),
   CACHE_LIMIT_IN_BYTES: xbytes.parseSize(process.env.CACHE_LIMIT ?? '2GB'),
+  CACHE_DURATION_LIMIT_SECONDS: process.env.CACHE_DURATION_LIMIT_SECONDS ?? (30 * 60),
+  BOT_NAME: process.env.BOT_NAME ?? 'fartbot',
   BOT_STATUS: process.env.BOT_STATUS ?? 'online',
   BOT_ACTIVITY_TYPE: process.env.BOT_ACTIVITY_TYPE ?? 'LISTENING',
   BOT_ACTIVITY_URL: process.env.BOT_ACTIVITY_URL ?? '',
@@ -46,15 +48,23 @@ const BOT_ACTIVITY_TYPE_MAP = {
 @injectable()
 export default class Config {
   readonly DISCORD_TOKEN!: string;
+  readonly WEBSERVER_PORT!: number;
+  readonly WEBSERVER_PASSWORD!: string;
+  readonly HTTP_PROXY!: string;
+  readonly YTDLP_PATH!: string;
   readonly YOUTUBE_API_KEY!: string;
   readonly SPOTIFY_CLIENT_ID!: string;
   readonly SPOTIFY_CLIENT_SECRET!: string;
+  readonly SOUNDCLOUD_CLIENT_ID!: string;
+  readonly SOUNDCLOUD_OAUTH_TOKEN!: string;
   readonly REGISTER_COMMANDS_ON_BOT!: boolean;
   readonly WEBSERVER_PORT!: number;
   readonly WEBSERVER_PASSWORD!: string;
   readonly DATA_DIR!: string;
   readonly CACHE_DIR!: string;
   readonly CACHE_LIMIT_IN_BYTES!: number;
+  readonly CACHE_DURATION_LIMIT_SECONDS!: number;
+  readonly BOT_NAME!: string;
   readonly BOT_STATUS!: PresenceStatusData;
   readonly BOT_ACTIVITY_TYPE!: Exclude<ActivityType, ActivityType.Custom>;
   readonly BOT_ACTIVITY_URL!: string;

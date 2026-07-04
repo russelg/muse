@@ -5,6 +5,7 @@ import PlayerManager from '../managers/player.js';
 import Command from './index.js';
 import {SlashCommandBuilder} from '@discordjs/builders';
 import {buildPlayingMessageEmbed} from '../utils/build-embed.js';
+import debug from '../utils/debug.js';
 
 @injectable()
 export default class implements Command {
@@ -34,6 +35,7 @@ export default class implements Command {
     const player = this.playerManager.get(interaction.guild!.id);
 
     try {
+      debug(`Skipping forward by ${numToSkip} songs`);
       await player.forward(numToSkip);
       await interaction.reply({
         content: 'keep \'er movin\'',

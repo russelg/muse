@@ -1,14 +1,16 @@
-import {VoiceChannel, Snowflake} from 'discord.js';
+import {Snowflake, VoiceChannel} from 'discord.js';
 import {Readable} from 'stream';
 import {setTimeout as sleep} from 'timers/promises';
 import hasha from 'hasha';
 import {WriteStream} from 'fs-capacitor';
 import ffmpeg from 'fluent-ffmpeg';
 import shuffle from 'array-shuffle';
+import {ChildProcess, ChildProcessWithoutNullStreams, spawn} from 'child_process';
 import {
   AudioPlayer,
   AudioPlayerState,
-  AudioPlayerStatus, AudioResource,
+  AudioPlayerStatus,
+  AudioResource,
   createAudioPlayer,
   createAudioResource, DiscordGatewayAdapterCreator,
   entersState,
@@ -28,6 +30,8 @@ import {Setting} from '@prisma/client';
 export enum MediaSource {
   Youtube,
   HLS,
+  SoundCloud,
+  Cache,
 }
 
 export interface QueuedPlaylist {
@@ -38,7 +42,7 @@ export interface QueuedPlaylist {
 export interface SongMetadata {
   title: string;
   artist: string;
-  url: string; // For YT, it's the video ID (not the full URI)
+  url: string;
   length: number;
   offset: number;
   playlist: QueuedPlaylist | null;
@@ -46,6 +50,7 @@ export interface SongMetadata {
   thumbnailUrl: string | null;
   source: MediaSource;
 }
+
 export interface QueuedSong extends SongMetadata {
   addedInChannelId: Snowflake;
   requestedBy: string;
@@ -58,8 +63,9 @@ export enum STATUS {
   IDLE,
 }
 
-export interface PlayerEvents {
-  statusChange: (oldStatus: STATUS, newStatus: STATUS) => void;
+interface YtDlpResponse {
+  is_live?: boolean;
+  duration?: number;
 }
 
 export const DEFAULT_VOLUME = 100;
@@ -80,9 +86,13 @@ export default class {
   private nowPlaying: QueuedSong | null = null;
   private playPositionInterval: NodeJS.Timeout | undefined;
   private lastSongURL = '';
+  private activeSourceProcess: ChildProcessWithoutNullStreams | null = null;
+  private activeFfmpegProcess: ChildProcess | null = null;
 
   private positionInSeconds = 0;
   private readonly fileCache: FileCacheProvider;
+  private readonly soundcloud: Soundcloud;
+  private readonly config: Config;
   private disconnectTimer: NodeJS.Timeout | null = null;
 
   private readonly channelToSpeakingUsers: Map<string, Set<string>> = new Map();
@@ -90,6 +100,7 @@ export default class {
 
   constructor(fileCache: FileCacheProvider, guildId: string) {
     this.fileCache = fileCache;
+    this.config = config;
     this.guildId = guildId;
   }
 
@@ -143,6 +154,8 @@ export default class {
   }
 
   disconnect(): void {
+    this.stopActivePlayback();
+
     if (this.voiceConnection) {
       if (this.status === STATUS.PLAYING) {
         this.pause();
@@ -183,8 +196,9 @@ export default class {
       to = currentSong.length + currentSong.offset;
     }
 
+    debug('seek: getting stream');
     const stream = await this.getStream(currentSong, {seek: realPositionSeconds, to});
-    this.audioPlayer = createAudioPlayer({
+    this.audioPlayer = this.audioPlayer ?? createAudioPlayer({
       behaviors: {
         // Needs to be somewhat high for livestreams
         maxMissedFrames: 50,
@@ -223,6 +237,7 @@ export default class {
 
     // Resume from paused state
     if (this.status === STATUS.PAUSED && currentSong.url === this.nowPlaying?.url) {
+      debug('resume from paused state');
       if (this.audioPlayer) {
         this.audioPlayer.unpause();
         this.status = STATUS.PLAYING;
@@ -232,6 +247,7 @@ export default class {
 
       // Was disconnected, need to recreate stream
       if (!currentSong.isLive) {
+        debug('seeking to previous position');
         return this.seek(this.getPosition());
       }
     }
@@ -244,8 +260,9 @@ export default class {
         to = currentSong.length + currentSong.offset;
       }
 
+      debug('play: getting stream');
       const stream = await this.getStream(currentSong, {seek: positionSeconds, to});
-      this.audioPlayer = createAudioPlayer({
+      this.audioPlayer = this.audioPlayer ?? createAudioPlayer({
         behaviors: {
           // Needs to be somewhat high for livestreams
           maxMissedFrames: 50,
@@ -267,6 +284,10 @@ export default class {
         this.lastSongURL = currentSong.url;
       }
     } catch (error: unknown) {
+      if (this.status === STATUS.IDLE) {
+        return;
+      }
+
       await this.forward(1);
 
       if ((error as {statusCode: number}).statusCode === 410 && currentSong) {
@@ -274,11 +295,8 @@ export default class {
 
         if (channelId) {
           debug(`${currentSong.title} is unavailable`);
-          return;
         }
       }
-
-      throw error;
     }
   }
 
@@ -300,12 +318,15 @@ export default class {
     this.manualForward(skip);
 
     try {
-      if (this.getCurrent() && this.status !== STATUS.PAUSED) {
+      const currentSong = this.getCurrent();
+      if (currentSong && this.status !== STATUS.PAUSED) {
+        debug('forward; has song and not paused... play()', currentSong, this.status);
         await this.play();
       } else {
         await this.finishQueue();
       }
     } catch (error: unknown) {
+      debug('forward; error', error);
       this.queuePosition--;
       throw error;
     }
@@ -374,6 +395,7 @@ export default class {
 
   manualForward(skip: number): void {
     if (this.canGoForward(skip)) {
+      debug(`canGoForward; advancing queuePosition by ${skip} (previously ${this.queuePosition}`);
       this.queuePosition += skip;
       this.positionInSeconds = 0;
       this.stopTrackingPosition();
@@ -406,6 +428,10 @@ export default class {
     }
 
     return null;
+  }
+
+  getQueuePosition(): number {
+    return this.queuePosition;
   }
 
   /**
@@ -459,10 +485,6 @@ export default class {
     this.queue.splice(this.queuePosition + index, amount);
   }
 
-  removeCurrent(): void {
-    this.queue = [...this.queue.slice(0, this.queuePosition), ...this.queue.slice(this.queuePosition + 1)];
-  }
-
   queueSize(): number {
     return this.getQueue().length;
   }
@@ -472,6 +494,8 @@ export default class {
   }
 
   stop(): void {
+    this.status = STATUS.IDLE;
+    this.stopActivePlayback();
     this.disconnect();
     this.queuePosition = 0;
     this.queue = [];
@@ -487,15 +511,71 @@ export default class {
     return this.queue[this.queuePosition + to];
   }
 
-  setVolume(level: number): void {
-    // Level should be a number between 0 and 100 = 0% => 100%
-    this.volume = level;
-    this.setAudioPlayerVolume(level);
+  resetVolume() {
+    this.volume = this.defaultVolume;
+    this.setAudioPlayerVolume(this.volume);
   }
 
   getVolume(): number {
     // Only use default volume if player volume is not already set (in the event of a reconnect we shouldn't reset)
     return this.volume ?? this.defaultVolume;
+  }
+
+  private async getVideoInfoWithYtDlp(url: string): Promise<YtDlpResponse> {
+    return new Promise((resolve, reject) => {
+      const ytDlp = spawn(this.config.YTDLP_PATH, ['--dump-json', '--no-warnings', url]);
+
+      let stdout = '';
+      let stderr = '';
+
+      ytDlp.stdout.on('data', (data: Buffer) => {
+        stdout += data.toString();
+      });
+
+      ytDlp.stderr.on('data', (data: Buffer) => {
+        stderr += data.toString();
+      });
+
+      ytDlp.on('close', (code: number) => {
+        if (code === 0) {
+          try {
+            const info = JSON.parse(stdout) as YtDlpResponse;
+            resolve(info);
+          } catch (parseError: unknown) {
+            reject(new Error(`Failed to parse yt-dlp JSON output: ${String(parseError)}`));
+          }
+        } else {
+          reject(new Error(`yt-dlp failed with code ${code}: ${stderr}`));
+        }
+      });
+
+      ytDlp.on('error', (error: Error) => {
+        reject(new Error(`Failed to spawn yt-dlp: ${error.message}`));
+      });
+    });
+  }
+
+  private extractVideoId(url: string): string {
+    const regex = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/;
+    const match = regex.exec(url);
+    return match?.[1] ?? url;
+  }
+
+  private async getYouTubeInfo(url: string): Promise<{
+    isLive: boolean;
+    lengthSeconds: string;
+  }> {
+    const videoId = getYouTubeID(url) ?? this.extractVideoId(url);
+
+    // Construct full YouTube URL if we only have a video ID
+    const fullUrl = url.includes('youtube.com') || url.includes('youtu.be') ? url : `https://www.youtube.com/watch?v=${videoId}`;
+
+    const info = await this.getVideoInfoWithYtDlp(fullUrl);
+
+    return {
+      isLive: info.is_live ?? false,
+      lengthSeconds: info.duration?.toString() ?? '0',
+    };
   }
 
   private getHashForCache(url: string): string {
@@ -509,13 +589,21 @@ export default class {
       this.audioPlayer?.stop(true);
     }
 
+    this.stopActivePlayback();
+
     if (song.source === MediaSource.HLS) {
       return this.createReadStream({url: song.url, cacheKey: song.url});
     }
 
-    let ffmpegInput: string | null;
+    if (song.source === MediaSource.SoundCloud) {
+      const scSong = await this.soundcloud.util.streamTrack(song.url) as Readable;
+      return this.createReadStream({url: scSong, cacheKey: song.url});
+    }
+
+    let ffmpegInput: string | Readable | null;
     const ffmpegInputOptions: string[] = [];
     let shouldCacheVideo = false;
+    let ytDlpProcess: ChildProcessWithoutNullStreams | null = null;
 
     ffmpegInput = await this.fileCache.getPathFor(this.getHashForCache(song.url));
 
@@ -578,6 +666,46 @@ export default class {
     }
   }
 
+  private stopActiveSourceProcess(): void {
+    this.killChildProcess(this.activeSourceProcess);
+    this.activeSourceProcess = null;
+  }
+
+  private killProcessGroup(pid: number): void {
+    try {
+      process.kill(-pid, 'SIGKILL');
+    } catch {
+      try {
+        process.kill(pid, 'SIGKILL');
+      } catch {
+        // Best-effort cleanup; process may already be gone.
+      }
+    }
+  }
+
+  private killChildProcess(process: ChildProcess | ChildProcessWithoutNullStreams | null): void {
+    if (!process) {
+      return;
+    }
+
+    try {
+      if (process.pid) {
+        this.killProcessGroup(process.pid);
+      } else {
+        process.kill('SIGKILL');
+      }
+    } catch {
+      // Best-effort cleanup; process may already be gone.
+    }
+  }
+
+  private stopActivePlayback(): void {
+    this.killChildProcess(this.activeFfmpegProcess);
+    this.activeFfmpegProcess = null;
+
+    this.stopActiveSourceProcess();
+  }
+
   private attachListeners(): void {
     if (!this.voiceConnection) {
       return;
@@ -587,8 +715,12 @@ export default class {
       return;
     }
 
-    if (this.audioPlayer.listeners('stateChange').length === 0) {
+    if (this.audioPlayer.listeners(AudioPlayerStatus.Idle).length === 0) {
       this.audioPlayer.on(AudioPlayerStatus.Idle, this.onAudioPlayerIdle.bind(this));
+    }
+
+    if (this.audioPlayer.listeners('error').length === 0) {
+      this.audioPlayer.on('error', this.onAudioPlayerError.bind(this));
     }
   }
 
@@ -721,12 +853,19 @@ export default class {
       const returnedStream = capacitor.createReadStream();
       let hasReturnedStreamClosed = false;
 
-      const stream = ffmpeg(options.url)
-        .inputOptions(options?.ffmpegInputOptions ?? ['-re'])
+      let stream = ffmpeg(options.url);
+
+      if (options?.proxy) {
+        stream = stream.withOption(['-http_proxy', options.proxy]);
+      }
+
+      stream = stream.inputOptions(options?.ffmpegInputOptions ?? ['-re'])
         .noVideo()
         .audioCodec('libopus')
         .outputFormat('webm')
         .on('error', error => {
+          this.killChildProcess(options.sourceProcess ?? null);
+
           if (!hasReturnedStreamClosed) {
             reject(error);
           }
@@ -742,8 +881,21 @@ export default class {
           stream.kill('SIGKILL');
         }
 
+        this.killChildProcess(options.sourceProcess ?? null);
+        if (this.activeFfmpegProcess !== null) {
+          this.activeFfmpegProcess = null;
+        }
+
         hasReturnedStreamClosed = true;
       });
+
+      if (options.sourceProcess) {
+        options.sourceProcess.on('close', code => {
+          if (code !== 0 && !hasReturnedStreamClosed) {
+            returnedStream.destroy(new Error(`yt-dlp exited with code ${code ?? 'unknown'}`));
+          }
+        });
+      }
 
       resolve(returnedStream);
     });
