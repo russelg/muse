@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- REST API server with `/np`, `/play`, `/skip`, and `/unskip` endpoints, configurable via `WEBSERVER_PORT` and `WEBSERVER_PASSWORD`.
+- YouTube cookie support for improved playback reliability.
+- Support for additional JS runtimes; include Deno in the Docker image.
+
 ## [2.11.5] - 2026-06-04
 
 - Fix queue-empty crashes when auto-announce is enabled or playback ends without a next song.
