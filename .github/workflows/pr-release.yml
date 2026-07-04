@@ -77,7 +77,6 @@ jobs:
           path: /tmp/metadata/metadata.json
 
       - name: Download PR number
-        continue-on-error: true
         uses: actions/download-artifact@v8
         with:
           path: /tmp/pull_request_number
@@ -88,10 +87,8 @@ jobs:
       - name: Read PR number
         shell: bash
         run: |
-          if [ -f /tmp/pull_request_number/pull_request_number.txt ]; then
-            pr_number="$(tr -d '\n' < /tmp/pull_request_number/pull_request_number.txt)"
-            echo "PR_NUMBER=${pr_number}" >> "$GITHUB_ENV"
-          fi
+          pr_number="$(tr -d '\n' < /tmp/pull_request_number/pull_request_number.txt)"
+          echo "PR_NUMBER=${pr_number}" >> "$GITHUB_ENV"
 
       - name: Create manifest list and push
         run: |
@@ -99,7 +96,6 @@ jobs:
           docker buildx imagetools create ${tags} ${{ env.REGISTRY_IMAGE }}:${{ env.SHA }}-linux-amd64
 
       - name: Create comment
-        if: env.PR_NUMBER != ''
         uses: marocchino/sticky-pull-request-comment@v3.0.4
         with:
           header: "pr-release"
