@@ -70,12 +70,8 @@ WORKDIR /usr/app
 COPY --from=builder /usr/app/dist ./dist
 COPY --from=dependencies /usr/app/prod_node_modules node_modules
 COPY --from=builder /usr/app/node_modules/.prisma/client ./node_modules/.prisma/client
-COPY --from=builder /usr/app/scripts ./scripts
 
 COPY . .
-
-# Make the startup script executable
-RUN chmod +x scripts/start-with-ytdlp-update.sh
 
 ARG COMMIT_HASH=unknown
 ARG BUILD_DATE=unknown
@@ -86,4 +82,4 @@ ENV COMMIT_HASH=$COMMIT_HASH
 ENV BUILD_DATE=$BUILD_DATE
 ENV ENV_FILE=/config
 
-CMD ["tini", "--", "./scripts/start-with-ytdlp-update.sh"]
+CMD ["tini", "--", "node", "--enable-source-maps", "dist/scripts/migrate-and-start.js"]

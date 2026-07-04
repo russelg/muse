@@ -3,7 +3,7 @@ import {readPackageSync} from 'read-pkg';
 
 const logBanner = () => {
   console.log(makeLines({
-    user: 'russelg',
+    user: 'codetheweb',
     repository: 'muse',
     version: readPackageSync().version,
     paypalUser: 'codetheweb',

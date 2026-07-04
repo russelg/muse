@@ -135,43 +135,26 @@ export default class AddQueryToQueue {
     shuffleAdditions,
     shouldSplitChapters,
     skipCurrentTrack,
-    guildId,
-    targetVoiceChannel,
     interaction,
-    username,
   }: {
     query: string;
     addToFrontOfQueue: boolean;
     shuffleAdditions: boolean;
     shouldSplitChapters: boolean;
     skipCurrentTrack: boolean;
-    guildId: string;
-    targetVoiceChannel?: VoiceChannel;
-    interaction?: ChatInputCommandInteraction;
-    username?: string;
-  }): Promise<string> {
+    interaction: ChatInputCommandInteraction;
+  }): Promise<void> {
+    const guildId = interaction.guild!.id;
     const player = this.playerManager.get(guildId);
     const wasPlayingSong = player.getCurrent() !== null;
 
-    const guild = this.client.guilds.cache.get(guildId);
-    const botMember = this.client.user
-      ? await guild?.members.fetch(this.client.user)
-      : undefined;
-    const member = interaction
-      ? interaction?.member as GuildMember
-      : botMember;
-
-    if (!targetVoiceChannel) {
-      targetVoiceChannel = getMemberVoiceChannel(member)?.[0] ?? getMostPopularVoiceChannel(guild!)?.[0] ?? null;
-    }
+    const [targetVoiceChannel] = getMemberVoiceChannel(interaction.member as GuildMember) ?? getMostPopularVoiceChannel(interaction.guild!);
 
     const settings = await getGuildSettings(guildId);
 
     const {playlistLimit, queueAddResponseEphemeral} = settings;
 
-    if (interaction) {
-      await interaction.deferReply({ephemeral: queueAddResponseEphemeral});
-    }
+    await interaction.deferReply({ephemeral: queueAddResponseEphemeral});
 
     let [newSongs, extraMsg] = await this.getSongs.getSongs(query, playlistLimit, shouldSplitChapters);
 
@@ -187,9 +170,6 @@ export default class AddQueryToQueue {
       newSongs = await Promise.all(newSongs.map(this.skipNonMusicSegments.bind(this)));
     }
 
-    const botName = this.config.BOT_NAME;
-    const memberUsername = member?.nickname ?? member?.user.username ?? botName;
-    const requestedByName = username ?? memberUsername;
     newSongs.forEach(song => {
       player.add({
         ...song,
@@ -204,10 +184,6 @@ export default class AddQueryToQueue {
     let statusMsg = '';
 
     if (player.voiceConnection === null) {
-      if (getSizeWithoutBots(targetVoiceChannel) === 0) {
-        throw new Error('No one is in a channel, we cannot join');
-      }
-
       await player.connect(targetVoiceChannel);
 
       // Resume / start playback
@@ -217,11 +193,9 @@ export default class AddQueryToQueue {
         statusMsg = 'resuming playback';
       }
 
-      if (interaction) {
-        await interaction.editReply({
-          embeds: [buildPlayingMessageEmbed(player)],
-        });
-      }
+      await interaction.editReply({
+        embeds: [buildPlayingMessageEmbed(player)],
+      });
     } else if (player.status === STATUS.IDLE) {
       // Player is idle, start playback instead
       await player.play();
@@ -248,54 +222,18 @@ export default class AddQueryToQueue {
       extraMsg = ` (${extraMsg})`;
     }
 
-    if (newSongs.length !== 1) {
-      const message = `u betcha, **${firstSong.title}** and ${newSongs.length - 1} other songs were added to the queue${extraMsg}`;
-      if (interaction) {
-        await interaction.editReply(message);
-      }
-
-      return message;
+    if (newSongs.length === 1) {
+      await interaction.editReply(`u betcha, **${firstSong.title}** added to the${addToFrontOfQueue ? ' front of the' : ''} queue${skipCurrentTrack ? 'and current track skipped' : ''}${extraMsg}`);
+    } else {
+      await interaction.editReply(`u betcha, **${firstSong.title}** and ${newSongs.length - 1} other songs were added to the queue${skipCurrentTrack ? 'and current track skipped' : ''}${extraMsg}`);
     }
-
-    const message = `u betcha, **${firstSong.title}** added to the${addToFrontOfQueue ? ' front of the' : ''} queue${extraMsg}`;
-    if (interaction) {
-      await interaction.editReply(message);
-    }
-
-    return message;
-  }
-
-  public async addToQueue({
-    query,
-    addToFrontOfQueue,
-    shuffleAdditions,
-    shouldSplitChapters,
-    skipCurrentTrack,
-    interaction,
-  }: {
-    query: string;
-    addToFrontOfQueue: boolean;
-    shuffleAdditions: boolean;
-    shouldSplitChapters: boolean;
-    skipCurrentTrack: boolean;
-    interaction: ChatInputCommandInteraction;
-  }) {
-    return this.addToQueueInternal({
-      query,
-      addToFrontOfQueue,
-      shuffleAdditions,
-      shouldSplitChapters,
-      skipCurrentTrack,
-      interaction,
-      guildId: interaction.guild!.id,
-    });
   }
 
   private async skipNonMusicSegments(song: SongMetadata) {
     if (!this.sponsorBlock
-      || (this.sponsorBlockDisabledUntil && new Date() < this.sponsorBlockDisabledUntil)
-      || song.source !== MediaSource.Youtube
-      || !song.url) {
+          || (this.sponsorBlockDisabledUntil && new Date() < this.sponsorBlockDisabledUntil)
+          || song.source !== MediaSource.Youtube
+          || !song.url) {
       return song;
     }
 

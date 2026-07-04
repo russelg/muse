@@ -1,5 +1,5 @@
 import {inject, injectable} from 'inversify';
-import {parse, toSeconds} from 'iso8601-duration';
+import {toSeconds, parse} from 'iso8601-duration';
 import got, {Got} from 'got';
 import {SongMetadata, QueuedPlaylist, MediaSource} from './player.js';
 import {TYPES} from '../types.js';
