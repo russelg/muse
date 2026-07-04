@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Remove arm64 builder from CI workflows.
+
 ## [2.11.6] - 2026-07-04
 
 ### Added
