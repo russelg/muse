@@ -265,6 +265,10 @@ export const getYouTubeMediaSource = async (videoIdOrUrl: string): Promise<YtDlp
       args.push('--cookies', process.env.YT_DLP_COOKIES);
     }
 
+    if (process.env.YT_DLP_JS_RUNTIMES) {
+      args.push('--js-runtimes', process.env.YT_DLP_JS_RUNTIMES);
+    }
+
     args.push(toYouTubeWatchUrl(videoIdOrUrl));
 
     const {stdout} = await execa(getExecutable(), args, {

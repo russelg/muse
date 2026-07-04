@@ -1,6 +1,7 @@
 FROM node:22-bookworm-slim AS base
 
 ARG YT_DLP_VERSION=
+ARG DENO_VERSION=2.9.1
 ENV MUSE_BUNDLED_YT_DLP_PATH=/opt/yt-dlp/bin/yt-dlp
 
 # openssl will be a required package if base is updated to 18.16+ due to node:*-slim base distro change
@@ -14,13 +15,19 @@ RUN apt-get update \
     ca-certificates \
     python3 \
     python3-venv \
+    curl \
+    unzip \
     && python3 -m venv /opt/yt-dlp \
     && if [ -n "${YT_DLP_VERSION}" ]; then \
-        /opt/yt-dlp/bin/pip install --no-cache-dir "yt-dlp==${YT_DLP_VERSION}"; \
+        /opt/yt-dlp/bin/pip install --no-cache-dir "yt-dlp[default]==${YT_DLP_VERSION}"; \
     else \
-        /opt/yt-dlp/bin/pip install --no-cache-dir yt-dlp; \
+        /opt/yt-dlp/bin/pip install --no-cache-dir "yt-dlp[default]"; \
     fi \
     && ln -s /opt/yt-dlp/bin/yt-dlp /usr/local/bin/yt-dlp \
+    && curl -fsSLo /tmp/deno.zip "https://github.com/denoland/deno/releases/download/v${DENO_VERSION}/deno-$(uname -m | sed 's/x86_64/x86_64-unknown-linux-gnu/;s/aarch64/aarch64-unknown-linux-gnu/').zip" \
+    && unzip -q /tmp/deno.zip -d /usr/local/bin \
+    && chmod +x /usr/local/bin/deno \
+    && rm /tmp/deno.zip \
     && apt-get autoclean \
     && apt-get autoremove \
     && rm -rf /var/lib/apt/lists/*

@@ -33,6 +33,7 @@ const CONFIG_MAP = {
   YT_DLP_PATH: firstNonEmpty(process.env.YT_DLP_PATH, process.env.MUSE_BUNDLED_YT_DLP_PATH) ?? 'yt-dlp',
   YT_DLP_AUTO_UPDATE: process.env.YT_DLP_AUTO_UPDATE === 'true',
   YT_DLP_COOKIES: process.env.YT_DLP_COOKIES ?? '',
+  YT_DLP_JS_RUNTIMES: process.env.YT_DLP_JS_RUNTIMES ?? '',
 } as const;
 
 const BOT_ACTIVITY_TYPE_MAP = {
@@ -63,6 +64,7 @@ export default class Config {
   readonly YT_DLP_PATH!: string;
   readonly YT_DLP_AUTO_UPDATE!: boolean;
   readonly YT_DLP_COOKIES!: string;
+  readonly YT_DLP_JS_RUNTIMES!: string;
 
   constructor() {
     for (const [key, value] of Object.entries(CONFIG_MAP)) {
