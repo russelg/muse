@@ -77,6 +77,7 @@ export default class AddQueryToQueue {
         ...song,
         addedInChannelId: interaction.channel!.id,
         requestedBy: interaction.member!.user.id,
+        requestedByName: (interaction.member as GuildMember).displayName,
       }, {immediate: addToFrontOfQueue ?? false});
     });
 
