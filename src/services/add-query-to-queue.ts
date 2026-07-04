@@ -33,7 +33,6 @@ export default class AddQueryToQueue {
   }
 
   // API-driven queue addition (no Discord interaction)
-  // eslint-disable-next-line max-params
   public async addToQueueInternal({
     query,
     addToFrontOfQueue,
