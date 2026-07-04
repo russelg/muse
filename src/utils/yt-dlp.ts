@@ -247,7 +247,7 @@ export const updateYtDlp = async (): Promise<YtDlpUpdateResult> => {
 
 export const getYouTubeMediaSource = async (videoIdOrUrl: string): Promise<YtDlpMediaSource> => {
   try {
-    const {stdout} = await execa(getExecutable(), [
+    const args = [
       '--dump-single-json',
       '--no-playlist',
       '--skip-download',
@@ -259,8 +259,15 @@ export const getYouTubeMediaSource = async (videoIdOrUrl: string): Promise<YtDlp
       'proto:https',
       '--extractor-args',
       'youtube:player_client=android_vr,default,-ios',
-      toYouTubeWatchUrl(videoIdOrUrl),
-    ], {
+    ];
+
+    if (process.env.YT_DLP_COOKIES) {
+      args.push('--cookies', process.env.YT_DLP_COOKIES);
+    }
+
+    args.push(toYouTubeWatchUrl(videoIdOrUrl));
+
+    const {stdout} = await execa(getExecutable(), args, {
       timeout: YT_DLP_EXTRACT_TIMEOUT_MS,
     });
 
