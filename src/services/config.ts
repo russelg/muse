@@ -19,6 +19,8 @@ const CONFIG_MAP = {
   SPOTIFY_CLIENT_ID: process.env.SPOTIFY_CLIENT_ID ?? '',
   SPOTIFY_CLIENT_SECRET: process.env.SPOTIFY_CLIENT_SECRET ?? '',
   REGISTER_COMMANDS_ON_BOT: process.env.REGISTER_COMMANDS_ON_BOT === 'true',
+  WEBSERVER_PORT: Number(process.env.WEBSERVER_PORT ?? 80),
+  WEBSERVER_PASSWORD: process.env.WEBSERVER_PASSWORD ?? '',
   DATA_DIR,
   CACHE_DIR: path.join(DATA_DIR, 'cache'),
   CACHE_LIMIT_IN_BYTES: xbytes.parseSize(process.env.CACHE_LIMIT ?? '2GB'),
@@ -46,6 +48,8 @@ export default class Config {
   readonly SPOTIFY_CLIENT_ID!: string;
   readonly SPOTIFY_CLIENT_SECRET!: string;
   readonly REGISTER_COMMANDS_ON_BOT!: boolean;
+  readonly WEBSERVER_PORT!: number;
+  readonly WEBSERVER_PASSWORD!: string;
   readonly DATA_DIR!: string;
   readonly CACHE_DIR!: string;
   readonly CACHE_LIMIT_IN_BYTES!: number;
