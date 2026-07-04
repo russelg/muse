@@ -1,4 +1,5 @@
 export const TYPES = {
+  Api: Symbol('Api'),
   Bot: Symbol('Bot'),
   KeyValueCache: Symbol('KeyValueCache'),
   FileCache: Symbol('FileCache'),
