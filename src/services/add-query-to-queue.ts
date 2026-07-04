@@ -1,4 +1,4 @@
-import {ChatInputCommandInteraction, GuildMember} from 'discord.js';
+import {ChatInputCommandInteraction, Client, GuildMember} from 'discord.js';
 import {inject, injectable} from 'inversify';
 import shuffle from 'array-shuffle';
 import {TYPES} from '../types.js';
@@ -6,7 +6,7 @@ import GetSongs from '../services/get-songs.js';
 import {MediaSource, SongMetadata, STATUS} from './player.js';
 import PlayerManager from '../managers/player.js';
 import {buildPlayingMessageEmbed} from '../utils/build-embed.js';
-import {getMemberVoiceChannel, getMostPopularVoiceChannel} from '../utils/channels.js';
+import {getMemberVoiceChannel, getMostPopularVoiceChannel, getSizeWithoutBots} from '../utils/channels.js';
 import {getGuildSettings} from '../utils/get-guild-settings.js';
 import {SponsorBlock} from 'sponsorblock-api';
 import Config from './config.js';
@@ -23,12 +23,110 @@ export default class AddQueryToQueue {
   constructor(@inject(TYPES.Services.GetSongs) private readonly getSongs: GetSongs,
     @inject(TYPES.Managers.Player) private readonly playerManager: PlayerManager,
     @inject(TYPES.Config) private readonly config: Config,
-    @inject(TYPES.KeyValueCache) cache: KeyValueCacheProvider) {
+    @inject(TYPES.KeyValueCache) cache: KeyValueCacheProvider,
+    @inject(TYPES.Client) private readonly client: Client) {
     this.sponsorBlockTimeoutDelay = config.SPONSORBLOCK_TIMEOUT;
     this.sponsorBlock = config.ENABLE_SPONSORBLOCK
       ? new SponsorBlock('muse-sb-integration') // UserID matters only for submissions
       : undefined;
     this.cache = cache;
+  }
+
+  // API-driven queue addition (no Discord interaction)
+  // eslint-disable-next-line max-params
+  public async addToQueueInternal({
+    query,
+    addToFrontOfQueue,
+    shuffleAdditions,
+    shouldSplitChapters,
+    skipCurrentTrack,
+    guildId,
+    username,
+  }: {
+    query: string;
+    addToFrontOfQueue: boolean;
+    shuffleAdditions: boolean;
+    shouldSplitChapters: boolean;
+    skipCurrentTrack: boolean;
+    guildId: string;
+    username?: string;
+  }): Promise<string> {
+    const player = this.playerManager.get(guildId);
+    const wasPlayingSong = player.getCurrent() !== null;
+
+    const guild = this.client.guilds.cache.get(guildId);
+    const targetVoiceChannel = getMemberVoiceChannel(
+      await guild?.members.fetch(this.client.user!),
+    )?.[0] ?? getMostPopularVoiceChannel(guild!)?.[0] ?? null;
+
+    const settings = await getGuildSettings(guildId);
+    const {playlistLimit} = settings;
+
+    let [newSongs, extraMsg] = await this.getSongs.getSongs(query, playlistLimit, shouldSplitChapters);
+
+    if (newSongs.length === 0) {
+      throw new Error('no songs found');
+    }
+
+    if (shuffleAdditions) {
+      newSongs = shuffle(newSongs);
+    }
+
+    if (this.config.ENABLE_SPONSORBLOCK) {
+      newSongs = await Promise.all(newSongs.map(this.skipNonMusicSegments.bind(this)));
+    }
+
+    const memberUsername = (await guild?.members.fetch(this.client.user!))?.displayName ?? 'API';
+    const requestedByName = username ?? memberUsername;
+    newSongs.forEach(song => {
+      player.add({
+        ...song,
+        addedInChannelId: targetVoiceChannel?.id ?? guildId,
+        requestedBy: this.client.user!.id,
+        requestedByName,
+      }, {immediate: addToFrontOfQueue ?? false});
+    });
+
+    const firstSong = newSongs[0];
+
+    let statusMsg = '';
+
+    if (player.voiceConnection === null) {
+      if (!targetVoiceChannel || getSizeWithoutBots(targetVoiceChannel) === 0) {
+        throw new Error('No one is in a channel, we cannot join');
+      }
+
+      await player.connect(targetVoiceChannel);
+      await player.play();
+
+      if (wasPlayingSong) {
+        statusMsg = 'resuming playback';
+      }
+    } else if (player.status === STATUS.IDLE) {
+      await player.play();
+    }
+
+    if (skipCurrentTrack) {
+      try {
+        await player.forward(1);
+      } catch (_: unknown) {
+        throw new Error('no song to skip to');
+      }
+    }
+
+    if (statusMsg !== '') {
+      extraMsg = extraMsg === '' ? statusMsg : `${statusMsg}, ${extraMsg}`;
+    }
+
+    if (extraMsg !== '') {
+      extraMsg = ` (${extraMsg})`;
+    }
+
+    if (newSongs.length !== 1) {
+      return `u betcha, **${firstSong.title}** and ${newSongs.length - 1} other songs were added to the queue${extraMsg}`;
+    }
+
+    return `u betcha, **${firstSong.title}** added to the${addToFrontOfQueue ? ' front of the' : ''} queue${extraMsg}`;
   }
 
   public async addToQueue({
