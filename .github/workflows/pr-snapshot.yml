@@ -1,6 +1,6 @@
 name: Build snapshot of PR
 
-on: pull_request
+on: [push, pull_request]
 
 env:
   REGISTRY_IMAGE: ghcr.io/russelg/muse
