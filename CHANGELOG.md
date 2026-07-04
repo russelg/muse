@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.11.6] - 2026-07-04
+
 ### Added
 - REST API server with `/np`, `/play`, `/skip`, and `/unskip` endpoints, configurable via `WEBSERVER_PORT` and `WEBSERVER_PASSWORD`.
 - YouTube cookie support for improved playback reliability.
@@ -396,7 +398,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial release
 
-[unreleased]: https://github.com/museofficial/muse/compare/v2.11.5...HEAD
+[unreleased]: https://github.com/russelg/muse/compare/v2.11.6...HEAD
+[2.11.6]: https://github.com/russelg/muse/compare/v2.11.5...v2.11.6
 [2.11.5]: https://github.com/museofficial/muse/compare/v2.11.4...v2.11.5
 [2.11.4]: https://github.com/museofficial/muse/compare/v2.11.3...v2.11.4
 [2.11.1]: https://github.com/museofficial/muse/compare/v2.11.0...v2.11.1
