@@ -20,6 +20,7 @@ export default class AddQueryToQueue {
   private readonly sponsorBlockTimeoutDelay;
   private readonly cache: KeyValueCacheProvider;
 
+  // eslint-disable-next-line max-params
   constructor(@inject(TYPES.Services.GetSongs) private readonly getSongs: GetSongs,
     @inject(TYPES.Managers.Player) private readonly playerManager: PlayerManager,
     @inject(TYPES.Config) private readonly config: Config,
