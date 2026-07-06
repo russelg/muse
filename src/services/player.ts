@@ -662,7 +662,23 @@ export default class {
         return;
       }
 
-      await this.forward(1);
+      // Try to play the next track, but skip unplayable ones (e.g. unavailable videos)
+      // to avoid crashing the bot.
+      const advanceOrSkip = async (): Promise<void> => {
+        try {
+          await this.forward(1);
+        } catch {
+          this.queue.splice(this.queuePosition + 1, 1);
+          if (this.canGoForward(1)) {
+            return advanceOrSkip();
+          }
+
+          await this.finishQueue();
+        }
+      };
+
+      await advanceOrSkip();
+
       const currentSong = this.getCurrent();
       if (!currentSong) {
         return;
