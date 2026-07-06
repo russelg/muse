@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.11.8] - 2026-07-06
+
 ### Fixed
 - Catch error when video is unavailable.
 
@@ -406,7 +408,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial release
 
-[unreleased]: https://github.com/russelg/muse/compare/v2.11.7...HEAD
+[unreleased]: https://github.com/russelg/muse/compare/v2.11.8...HEAD
+[2.11.8]: https://github.com/russelg/muse/compare/v2.11.7...v2.11.8
 [2.11.7]: https://github.com/russelg/muse/compare/v2.11.6...v2.11.7
 [2.11.6]: https://github.com/russelg/muse/compare/v2.11.5...v2.11.6
 [2.11.5]: https://github.com/museofficial/muse/compare/v2.11.4...v2.11.5
