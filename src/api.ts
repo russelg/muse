@@ -50,6 +50,8 @@ export default class {
     @inject(TYPES.Config) private readonly config: Config,
     @inject(TYPES.Services.AddQueryToQueue) private readonly addQueryToQueue: AddQueryToQueue,
   ) {
+    this.app.get('/health', (_req, res) => res.send({status: 'ok'}));
+
     this.app.get('/np/:guildId', async (req, res) => {
       try {
         const {guildId} = req.params;
