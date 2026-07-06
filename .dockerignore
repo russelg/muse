@@ -4,3 +4,15 @@ dist
 dts
 .env
 Dockerfile
+.git/
+.github/
+docs/
+venv/
+*.log
+*.md
+.DS_Store
+.idea/
+.junie/
+cookies.*.txt
+.release-it.json
+LICENSE
