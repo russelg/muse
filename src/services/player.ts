@@ -23,6 +23,7 @@ import debug from '../utils/debug.js';
 import {getGuildSettings} from '../utils/get-guild-settings.js';
 import {buildPlayingMessageEmbed} from '../utils/build-embed.js';
 import {getYouTubeMediaSource} from '../utils/yt-dlp.js';
+import Config from './config.js';
 import {Setting} from '@prisma/client';
 
 export enum MediaSource {
@@ -83,6 +84,7 @@ export default class {
 
   private positionInSeconds = 0;
   private readonly fileCache: FileCacheProvider;
+  private readonly config: Config;
   private disconnectTimer: NodeJS.Timeout | null = null;
 
   private readonly channelToSpeakingUsers: Map<string, Set<string>> = new Map();
@@ -91,6 +93,7 @@ export default class {
   constructor(fileCache: FileCacheProvider, guildId: string) {
     this.fileCache = fileCache;
     this.guildId = guildId;
+    this.config = new Config();
   }
 
   async connect(channel: VoiceChannel): Promise<void> {
@@ -520,7 +523,10 @@ export default class {
     ffmpegInput = await this.fileCache.getPathFor(this.getHashForCache(song.url));
 
     if (!ffmpegInput) {
-      const mediaSource = await getYouTubeMediaSource(song.url);
+      const mediaSource = await getYouTubeMediaSource(song.url, {
+        cookies: this.config.YT_DLP_COOKIES || undefined,
+        jsRuntimes: this.config.YT_DLP_JS_RUNTIMES || undefined,
+      });
       ffmpegInput = mediaSource.url;
 
       // Don't cache livestreams or long videos

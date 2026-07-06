@@ -245,7 +245,10 @@ export const updateYtDlp = async (): Promise<YtDlpUpdateResult> => {
   };
 };
 
-export const getYouTubeMediaSource = async (videoIdOrUrl: string): Promise<YtDlpMediaSource> => {
+export const getYouTubeMediaSource = async (
+  videoIdOrUrl: string,
+  opts?: {cookies?: string; jsRuntimes?: string},
+): Promise<YtDlpMediaSource> => {
   try {
     const args = [
       '--dump-single-json',
@@ -261,12 +264,12 @@ export const getYouTubeMediaSource = async (videoIdOrUrl: string): Promise<YtDlp
       'youtube:player_client=android_vr,default,-ios',
     ];
 
-    if (process.env.YT_DLP_COOKIES) {
-      args.push('--cookies', process.env.YT_DLP_COOKIES);
+    if (opts?.cookies) {
+      args.push('--cookies', opts.cookies);
     }
 
-    if (process.env.YT_DLP_JS_RUNTIMES) {
-      args.push('--js-runtimes', process.env.YT_DLP_JS_RUNTIMES);
+    if (opts?.jsRuntimes) {
+      args.push('--js-runtimes', opts.jsRuntimes);
     }
 
     args.push(toYouTubeWatchUrl(videoIdOrUrl));
