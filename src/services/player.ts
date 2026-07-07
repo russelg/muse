@@ -90,10 +90,10 @@ export default class {
   private readonly channelToSpeakingUsers: Map<string, Set<string>> = new Map();
   private hasRegisteredVoiceActivityListener = false;
 
-  constructor(fileCache: FileCacheProvider, guildId: string) {
+  constructor(fileCache: FileCacheProvider, config: Config, guildId: string) {
     this.fileCache = fileCache;
+    this.config = config;
     this.guildId = guildId;
-    this.config = new Config();
   }
 
   async connect(channel: VoiceChannel): Promise<void> {
