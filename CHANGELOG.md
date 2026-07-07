@@ -6,6 +6,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `/health` endpoint for Docker HEALTHCHECK.
+
+### Changed
+- Dockerfile: remove Deno, add build cache mounts, run as non-root `node` user.
+
+### Fixed
+- Config not being applied correctly to certain components.
+- Default `WEBSERVER_PORT` changed from 80 to 8080 for non-root Docker compatibility.
+- `yt-dlp` now uses Config parameters instead of raw `process.env`.
+
 ## [2.11.8] - 2026-07-06
 
 ### Fixed
