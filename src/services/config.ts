@@ -19,7 +19,7 @@ const CONFIG_MAP = {
   SPOTIFY_CLIENT_ID: process.env.SPOTIFY_CLIENT_ID ?? '',
   SPOTIFY_CLIENT_SECRET: process.env.SPOTIFY_CLIENT_SECRET ?? '',
   REGISTER_COMMANDS_ON_BOT: process.env.REGISTER_COMMANDS_ON_BOT === 'true',
-  WEBSERVER_PORT: Number(process.env.WEBSERVER_PORT ?? 80),
+  WEBSERVER_PORT: Number(process.env.WEBSERVER_PORT ?? 8080),
   WEBSERVER_PASSWORD: process.env.WEBSERVER_PASSWORD ?? '',
   DATA_DIR,
   CACHE_DIR: path.join(DATA_DIR, 'cache'),
