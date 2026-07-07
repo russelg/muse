@@ -1,13 +1,15 @@
 FROM node:22-bookworm-slim AS base
 
 ARG YT_DLP_VERSION=
-ARG DENO_VERSION=2.9.1
 ENV MUSE_BUNDLED_YT_DLP_PATH=/opt/yt-dlp/bin/yt-dlp
+ENV YT_DLP_JS_RUNTIMES=node
 
 # openssl will be a required package if base is updated to 18.16+ due to node:*-slim base distro change
 # https://github.com/prisma/prisma/issues/19729#issuecomment-1591270599
 # Install ffmpeg and yt-dlp runtime dependencies
-RUN apt-get update \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update \
     && apt-get install --no-install-recommends -y \
     ffmpeg \
     tini \
@@ -15,63 +17,58 @@ RUN apt-get update \
     ca-certificates \
     python3 \
     python3-venv \
-    curl \
-    unzip \
     && python3 -m venv /opt/yt-dlp \
     && if [ -n "${YT_DLP_VERSION}" ]; then \
         /opt/yt-dlp/bin/pip install --no-cache-dir "yt-dlp[default]==${YT_DLP_VERSION}"; \
     else \
         /opt/yt-dlp/bin/pip install --no-cache-dir "yt-dlp[default]"; \
     fi \
-    && ln -s /opt/yt-dlp/bin/yt-dlp /usr/local/bin/yt-dlp \
-    && curl -fsSLo /tmp/deno.zip "https://github.com/denoland/deno/releases/download/v${DENO_VERSION}/deno-$(uname -m | sed 's/x86_64/x86_64-unknown-linux-gnu/;s/aarch64/aarch64-unknown-linux-gnu/').zip" \
-    && unzip -q /tmp/deno.zip -d /usr/local/bin \
-    && chmod +x /usr/local/bin/deno \
-    && rm /tmp/deno.zip \
-    && apt-get autoclean \
-    && apt-get autoremove \
-    && rm -rf /var/lib/apt/lists/*
+    && ln -s /opt/yt-dlp/bin/yt-dlp /usr/local/bin/yt-dlp
 
-# Install dependencies
-FROM base AS dependencies
+# Prepare writable data directory for non-root user
+RUN mkdir -p /data && chown node:node /data
+
+# Build stage: install deps, compile TypeScript, generate Prisma client
+FROM base AS builder
 
 WORKDIR /usr/app
 
-# Add Python and build tools to compile native modules
-RUN apt-get update \
+# Install build tools for native module compilation
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update \
     && apt-get install --no-install-recommends -y \
     python-is-python3 \
-    build-essential \
-    && apt-get autoclean \
-    && apt-get autoremove \
-    && rm -rf /var/lib/apt/lists/*
+    build-essential
 
-COPY package.json .
-COPY yarn.lock .
+# Install all dependencies (prod + dev for build)
+COPY package.json yarn.lock ./
+RUN --mount=type=cache,target=/root/.cache/yarn \
+    yarn install --frozen-lockfile
 
-RUN yarn install --prod
-RUN cp -R node_modules /usr/app/prod_node_modules
+# Copy source and build
+COPY tsconfig.json ./
+COPY src/ ./src/
+COPY schema.prisma ./
+RUN yarn prisma generate \
+    && yarn build
 
-RUN yarn install
+# Prepare production-only node_modules for runner
+RUN --mount=type=cache,target=/root/.cache/yarn \
+    yarn install --frozen-lockfile --production \
+    && yarn cache clean
 
-FROM dependencies AS builder
-
-COPY . .
-
-# Run tsc build
-RUN yarn prisma generate
-RUN yarn build
-
-# Only keep what's necessary to run
+# Runner stage: minimal production image
 FROM base AS runner
 
 WORKDIR /usr/app
 
 COPY --from=builder /usr/app/dist ./dist
-COPY --from=dependencies /usr/app/prod_node_modules node_modules
-COPY --from=builder /usr/app/node_modules/.prisma/client ./node_modules/.prisma/client
-
-COPY . .
+COPY --from=builder /usr/app/node_modules ./node_modules
+COPY --from=builder /usr/app/package.json ./
+COPY src/ ./src/
+COPY migrations/ ./migrations/
+COPY schema.prisma ./
 
 ARG COMMIT_HASH=unknown
 ARG BUILD_DATE=unknown
@@ -81,5 +78,10 @@ ENV NODE_ENV=production
 ENV COMMIT_HASH=$COMMIT_HASH
 ENV BUILD_DATE=$BUILD_DATE
 ENV ENV_FILE=/config
+
+USER node
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD node -e "require('http').get('http://localhost:8080/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
 CMD ["tini", "--", "node", "--enable-source-maps", "dist/scripts/migrate-and-start.js"]
