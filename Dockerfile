@@ -25,9 +25,6 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     fi \
     && ln -s /opt/yt-dlp/bin/yt-dlp /usr/local/bin/yt-dlp
 
-# Prepare writable data directory for non-root user
-RUN mkdir -p /data && chown node:node /data
-
 # Build stage: install deps, compile TypeScript, generate Prisma client
 FROM base AS builder
 
@@ -79,9 +76,7 @@ ENV COMMIT_HASH=$COMMIT_HASH
 ENV BUILD_DATE=$BUILD_DATE
 ENV ENV_FILE=/config
 
-USER node
-
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD node -e "require('http').get('http://localhost:8080/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+    CMD node -e "require('http').get('http://localhost:80/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
 CMD ["tini", "--", "node", "--enable-source-maps", "dist/scripts/migrate-and-start.js"]
