@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.11.10] - 2026-07-08
+
 ### Fixed
 - Reverted non-root docker changes.
 
@@ -424,7 +426,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial release
 
-[unreleased]: https://github.com/russelg/muse/compare/v2.11.9...HEAD
+[unreleased]: https://github.com/russelg/muse/compare/v2.11.10...HEAD
+[2.11.10]: https://github.com/russelg/muse/compare/v2.11.9...v2.11.10
 [2.11.9]: https://github.com/russelg/muse/compare/v2.11.8...v2.11.9
 [2.11.8]: https://github.com/russelg/muse/compare/v2.11.7...v2.11.8
 [2.11.7]: https://github.com/russelg/muse/compare/v2.11.6...v2.11.7
