@@ -506,10 +506,12 @@ export default class {
   }
 
   private async getStream(song: QueuedSong, options: {seek?: number; to?: number} = {}): Promise<Readable> {
-    if (this.status === STATUS.PLAYING) {
-      this.audioPlayer?.stop();
-    } else if (this.status === STATUS.PAUSED) {
-      this.audioPlayer?.stop(true);
+    if (this.audioPlayer) {
+      // Remove all listeners to prevent stale Idle events from the old player
+      // from triggering queue advancement during the async gap below
+      // (e.g. while awaiting getYouTubeMediaSource for uncached songs).
+      this.audioPlayer.removeAllListeners();
+      this.audioPlayer.stop(true);
     }
 
     if (song.source === MediaSource.HLS) {
