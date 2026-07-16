@@ -3,7 +3,6 @@ import {Readable} from 'stream';
 import hasha from 'hasha';
 import {WriteStream} from 'fs-capacitor';
 import ffmpeg from 'fluent-ffmpeg';
-import {execa} from 'execa';
 import shuffle from 'array-shuffle';
 import {
   AudioPlayer,
@@ -33,7 +32,7 @@ import {destroyVoiceConnection, recoverVoiceConnection} from './voice-connection
 import debug from '../utils/debug.js';
 import {getGuildSettings} from '../utils/get-guild-settings.js';
 import {buildPlayingMessageEmbed} from '../utils/build-embed.js';
-import {getYouTubeMediaSource, YtDlpMediaUnavailableError, getExecutable} from '../utils/yt-dlp.js';
+import {getYouTubeMediaSource, YtDlpMediaUnavailableError} from '../utils/yt-dlp.js';
 import Config from './config.js';
 import {Setting} from '@prisma/client';
 
@@ -668,51 +667,6 @@ export default class {
     ffmpegInput = await this.fileCache.getPathFor(this.getHashForCache(song.url));
 
     if (!ffmpegInput) {
-      // With cookies, use yt-dlp as the HTTP downloader and pipe through ffmpeg
-      // for transcoding only — ffmpeg's libcurl can't pass the CDN's auth checks.
-      if (this.config.YT_DLP_COOKIES) {
-        debug(shouldCacheVideo ? 'Caching video (via yt-dlp)' : 'Not caching video (via yt-dlp)');
-
-        const args = [
-          '-f',
-          'bestaudio[ext=webm]',
-          '--cookies',
-          this.config.YT_DLP_COOKIES,
-          '--extractor-args',
-          'youtube:player_client=web_embedded',
-          '--no-playlist',
-          '--no-warnings',
-          '--no-cache-dir',
-          '-o',
-          '-',
-        ];
-
-        if (options.seek) {
-          args.push('--download-sections', `*${options.seek}-${options.to ?? ''}`);
-        }
-
-        const videoUrl = song.url.length === 11
-          ? `https://www.youtube.com/watch?v=${song.url}`
-          : song.url;
-
-        args.push(videoUrl);
-
-        const ytDlp = execa(getExecutable(), args, {
-          timeout: 0,
-        });
-
-        if (!ytDlp.stdout) {
-          throw new Error('yt-dlp failed to start');
-        }
-
-        return this.createReadStream({
-          inputStream: ytDlp.stdout,
-          cacheKey: song.url,
-          cache: shouldCacheVideo,
-          ffmpegInputOptions: ['-f', 'webm'],
-        });
-      }
-
       const mediaSource = await getYouTubeMediaSource(song.url);
       ffmpegInput = mediaSource.url;
 
@@ -981,7 +935,7 @@ export default class {
     return ['-headers', `${headerLines}\r\n`];
   }
 
-  private async createReadStream(options: {url?: string; inputStream?: Readable; cacheKey: string; ffmpegInputOptions?: string[]; cache?: boolean}): Promise<Readable> {
+  private async createReadStream(options: {url: string; cacheKey: string; ffmpegInputOptions?: string[]; cache?: boolean}): Promise<Readable> {
     return new Promise((resolve, reject) => {
       const capacitor = new WriteStream();
 
@@ -993,24 +947,15 @@ export default class {
       const returnedStream = capacitor.createReadStream();
       let hasReturnedStreamClosed = false;
 
-      const ffmpegInput = options.inputStream ?? options.url!;
-
-      const stream = ffmpeg(ffmpegInput)
-        .inputOptions(options?.ffmpegInputOptions ?? (options.inputStream ? [] : ['-re']))
+      const stream = ffmpeg(options.url)
+        .inputOptions(options?.ffmpegInputOptions ?? ['-re'])
         .noVideo()
-        .audioCodec(options.inputStream ? 'copy' : 'libopus')
+        .audioCodec('libopus')
         .outputFormat('webm')
-        .on('stderr', line => {
-          debug(`ffmpeg stderr: ${line}`);
-        })
         .on('error', error => {
-          debug(`ffmpeg error: ${error.message}`);
           if (!hasReturnedStreamClosed) {
             reject(error);
           }
-        })
-        .on('end', () => {
-          debug('ffmpeg process ended');
         })
         .on('start', command => {
           debug(`Spawned ffmpeg with ${command}`);

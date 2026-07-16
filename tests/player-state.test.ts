@@ -42,6 +42,7 @@ import getProgressBar from '../src/utils/get-progress-bar.js';
 import {YtDlpMediaUnavailableError} from '../src/utils/yt-dlp.js';
 
 const GUILD_ID = 'guild-id';
+const MOCK_CONFIG = {CACHE_DURATION_LIMIT_SECONDS: 1800, YT_DLP_COOKIES: ''};
 
 const makeDeferred = <T>() => {
   let resolve!: (value: T | PromiseLike<T>) => void;
@@ -73,6 +74,7 @@ const makeSong = (title: string, overrides: Partial<QueuedSong> = {}): QueuedSon
   source: MediaSource.Youtube,
   addedInChannelId: 'text-channel-id',
   requestedBy: 'requester-id',
+  requestedByName: 'Requester',
   ...overrides,
 });
 
@@ -96,7 +98,7 @@ const makeVoiceConnection = () => ({
 });
 
 const makeReadyPlayer = (ageRestrictedFallbackResolver?: (song: QueuedSong) => Promise<SongMetadata | null>) => {
-  const player = new Player({} as never, GUILD_ID, ageRestrictedFallbackResolver);
+  const player = new Player({} as never, MOCK_CONFIG as never, GUILD_ID, ageRestrictedFallbackResolver);
   const voiceConnection = makeVoiceConnection();
   const getStream = vi.fn().mockResolvedValue(Readable.from([]));
 
@@ -167,7 +169,7 @@ afterEach(() => {
 
 describe('Player forward state transitions', () => {
   it('restores the exact original queue position when a multi-skip destination fails to play', async () => {
-    const player = new Player({} as never, GUILD_ID);
+    const player = new Player({} as never, MOCK_CONFIG as never, GUILD_ID);
     player.add(makeSong('Original'));
     player.add(makeSong('Skipped'));
     player.add(makeSong('Failed destination'));
@@ -181,7 +183,7 @@ describe('Player forward state transitions', () => {
   });
 
   it('moves a paused non-empty queue forward while remaining paused and never schedules idle disconnect', async () => {
-    const player = new Player({} as never, GUILD_ID);
+    const player = new Player({} as never, MOCK_CONFIG as never, GUILD_ID);
     const voiceConnection = makeVoiceConnection();
     player.voiceConnection = voiceConnection as never;
     player.add(makeSong('First'));
@@ -201,7 +203,7 @@ describe('Player forward state transitions', () => {
   });
 
   it('finishes a paused queue only when forwarding reaches no current entry', async () => {
-    const player = new Player({} as never, GUILD_ID);
+    const player = new Player({} as never, MOCK_CONFIG as never, GUILD_ID);
     player.add(makeSong('Only entry'));
     player.status = STATUS.PAUSED;
 
@@ -384,7 +386,7 @@ describe('Player playback attempt ownership', () => {
 
 describe('Player same-URL entry identity', () => {
   it('exposes a distinct identity when a loop reuses the same song object as a new queue entry', () => {
-    const player = new Player({} as never, GUILD_ID);
+    const player = new Player({} as never, MOCK_CONFIG as never, GUILD_ID);
     const repeatedSong = makeSong('Looped entry');
     player.add(repeatedSong);
     const originalEntryIdentity = player.getCurrentQueueEntryId();
@@ -482,7 +484,7 @@ describe('Player queue-finish timer state', () => {
 
 describe('Player voice ducking', () => {
   it('stores a manual session volume once across overlapping speakers and restores it after the last speaker', () => {
-    const player = new Player({} as never, GUILD_ID);
+    const player = new Player({} as never, MOCK_CONFIG as never, GUILD_ID);
     const {handlers, setAudioVolume} = installVoiceActivityFakes(player);
     player.setVolume(35);
 
@@ -502,7 +504,7 @@ describe('Player voice ducking', () => {
   });
 
   it('applies the ducking target to a new audio resource while a speaker remains active', () => {
-    const player = new Player({} as never, GUILD_ID);
+    const player = new Player({} as never, MOCK_CONFIG as never, GUILD_ID);
     const {handlers} = installVoiceActivityFakes(player);
     player.setVolume(35);
     handlers.get('start')!('speaker-one');
@@ -516,7 +518,7 @@ describe('Player voice ducking', () => {
   });
 
   it('clears ducking state on disconnect so the next session can establish and restore its own volume', () => {
-    const player = new Player({} as never, GUILD_ID);
+    const player = new Player({} as never, MOCK_CONFIG as never, GUILD_ID);
     const firstSession = installVoiceActivityFakes(player);
     player.setVolume(35);
     firstSession.handlers.get('start')!('speaker-one');
@@ -534,7 +536,7 @@ describe('Player voice ducking', () => {
   });
 
   it('ignores a late end callback from a disconnected session while the new session remains ducked', () => {
-    const player = new Player({} as never, GUILD_ID);
+    const player = new Player({} as never, MOCK_CONFIG as never, GUILD_ID);
     const firstSession = installVoiceActivityFakes(player);
     player.setVolume(35);
     firstSession.handlers.get('start')!('speaker-one');
@@ -552,7 +554,7 @@ describe('Player voice ducking', () => {
   });
 
   it('ignores a late start callback from a disconnected session after the new session becomes quiet', () => {
-    const player = new Player({} as never, GUILD_ID);
+    const player = new Player({} as never, MOCK_CONFIG as never, GUILD_ID);
     const firstSession = installVoiceActivityFakes(player);
     player.setVolume(35);
     firstSession.handlers.get('start')!('speaker-one');
@@ -569,7 +571,7 @@ describe('Player voice ducking', () => {
   });
 
   it('restores volume when a recorded speaker leaves before their end event', () => {
-    const player = new Player({} as never, GUILD_ID);
+    const player = new Player({} as never, MOCK_CONFIG as never, GUILD_ID);
     const {handlers, members, setAudioVolume} = installVoiceActivityFakes(player);
     player.setVolume(35);
     handlers.get('start')!('speaker-one');
