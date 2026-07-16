@@ -21,3 +21,5 @@ jobs:
         run: yarn prisma generate
       - name: Run tests
         run: yarn test
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
