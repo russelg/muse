@@ -519,8 +519,7 @@ export default class {
       return this.createReadStream({url: song.url, cacheKey: song.url});
     }
 
-    const MAX_CACHE_LENGTH_SECONDS = 30 * 60; // 30 minutes
-    const shouldCacheVideo = !song.isLive && song.length < MAX_CACHE_LENGTH_SECONDS && !options.seek;
+    const shouldCacheVideo = !song.isLive && song.length < this.config.CACHE_DURATION_LIMIT_SECONDS && !options.seek;
 
     let ffmpegInput: string | null;
     const ffmpegInputOptions: string[] = [];

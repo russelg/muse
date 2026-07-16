@@ -24,6 +24,7 @@ const CONFIG_MAP = {
   DATA_DIR,
   CACHE_DIR: path.join(DATA_DIR, 'cache'),
   CACHE_LIMIT_IN_BYTES: xbytes.parseSize(process.env.CACHE_LIMIT ?? '2GB'),
+  CACHE_DURATION_LIMIT_SECONDS: parseInt(process.env.CACHE_DURATION_LIMIT_SECONDS ?? String(30 * 60), 10),
   BOT_STATUS: process.env.BOT_STATUS ?? 'online',
   BOT_ACTIVITY_TYPE: process.env.BOT_ACTIVITY_TYPE ?? 'LISTENING',
   BOT_ACTIVITY_URL: process.env.BOT_ACTIVITY_URL ?? '',
@@ -55,6 +56,7 @@ export default class Config {
   readonly DATA_DIR!: string;
   readonly CACHE_DIR!: string;
   readonly CACHE_LIMIT_IN_BYTES!: number;
+  readonly CACHE_DURATION_LIMIT_SECONDS!: number;
   readonly BOT_STATUS!: PresenceStatusData;
   readonly BOT_ACTIVITY_TYPE!: Exclude<ActivityType, ActivityType.Custom>;
   readonly BOT_ACTIVITY_URL!: string;
