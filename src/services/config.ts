@@ -14,8 +14,8 @@ const firstNonEmpty = (...values: Array<string | undefined>) => values
   .find((value): value is string => Boolean(value));
 
 const CONFIG_MAP = {
-  DISCORD_TOKEN: process.env.DISCORD_TOKEN,
-  YOUTUBE_API_KEY: process.env.YOUTUBE_API_KEY,
+  DISCORD_TOKEN: firstNonEmpty(process.env.DISCORD_TOKEN),
+  YOUTUBE_API_KEY: firstNonEmpty(process.env.YOUTUBE_API_KEY),
   SPOTIFY_CLIENT_ID: process.env.SPOTIFY_CLIENT_ID ?? '',
   SPOTIFY_CLIENT_SECRET: process.env.SPOTIFY_CLIENT_SECRET ?? '',
   REGISTER_COMMANDS_ON_BOT: process.env.REGISTER_COMMANDS_ON_BOT === 'true',
@@ -83,6 +83,10 @@ export default class Config {
       if (typeof value === 'number') {
         if (!Number.isFinite(value)) {
           throw new Error(`Invalid numeric value for ${key}`);
+        }
+
+        if (key === 'CACHE_LIMIT_IN_BYTES' && value < 0) {
+          throw new Error('Invalid numeric value for CACHE_LIMIT_IN_BYTES: value must be non-negative');
         }
 
         this[key as ConditionalKeys<typeof CONFIG_MAP, number>] = value;
