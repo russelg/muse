@@ -76,8 +76,6 @@ typings/
 # dotenv environment variables file
 .env
 .env.test
-cookies.json
-.data
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
@@ -109,3 +107,5 @@ dist
 
 # TernJS port file
 .tern-port
+cookies.txt
+cookies.*.txt

@@ -1,6 +1,4 @@
-/* eslint-disable complexity,max-depth */
-import {ChatInputCommandInteraction, Client, GuildMember, VoiceChannel} from 'discord.js';
-import {URL} from 'node:url';
+import {ChatInputCommandInteraction, Client, GuildMember} from 'discord.js';
 import {inject, injectable} from 'inversify';
 import shuffle from 'array-shuffle';
 import {TYPES} from '../types.js';
@@ -14,6 +12,10 @@ import {SponsorBlock} from 'sponsorblock-api';
 import Config from './config.js';
 import KeyValueCacheProvider from './key-value-cache.js';
 import {ONE_HOUR_IN_SECONDS} from '../utils/constants.js';
+
+const isSameQueueEntry = (capturedId: number | null, currentId: number | null) => (
+  capturedId !== null && capturedId === currentId
+);
 
 @injectable()
 export default class AddQueryToQueue {
@@ -35,6 +37,7 @@ export default class AddQueryToQueue {
     this.cache = cache;
   }
 
+  // API-driven queue addition (no Discord interaction)
   public async addToQueueInternal({
     query,
     addToFrontOfQueue,
@@ -42,8 +45,6 @@ export default class AddQueryToQueue {
     shouldSplitChapters,
     skipCurrentTrack,
     guildId,
-    targetVoiceChannel,
-    interaction,
     username,
   }: {
     query: string;
@@ -52,118 +53,20 @@ export default class AddQueryToQueue {
     shouldSplitChapters: boolean;
     skipCurrentTrack: boolean;
     guildId: string;
-    targetVoiceChannel?: VoiceChannel;
-    interaction?: ChatInputCommandInteraction;
     username?: string;
   }): Promise<string> {
     const player = this.playerManager.get(guildId);
     const wasPlayingSong = player.getCurrent() !== null;
 
     const guild = this.client.guilds.cache.get(guildId);
-    const botMember = this.client.user
-      ? await guild?.members.fetch(this.client.user)
-      : undefined;
-    const member = interaction
-      ? interaction?.member as GuildMember
-      : botMember;
-
-    if (!targetVoiceChannel) {
-      targetVoiceChannel = getMemberVoiceChannel(member)?.[0] ?? getMostPopularVoiceChannel(guild!)?.[0] ?? null;
-    }
+    const targetVoiceChannel = getMemberVoiceChannel(
+      await guild?.members.fetch(this.client.user!),
+    )?.[0] ?? getMostPopularVoiceChannel(guild!)?.[0] ?? null;
 
     const settings = await getGuildSettings(guildId);
+    const {playlistLimit} = settings;
 
-    const {playlistLimit, queueAddResponseEphemeral} = settings;
-
-    if (interaction) {
-      await interaction.deferReply({ephemeral: queueAddResponseEphemeral});
-    }
-
-    let newSongs: SongMetadata[] = [];
-    let extraMsg = '';
-
-    if (query.includes('cache::')) {
-      newSongs = await this.getSongs.cacheSource(query);
-    } else {
-      // Test if it's a complete URL
-      try {
-        const url = new URL(query);
-
-        const YOUTUBE_HOSTS = [
-          'www.youtube.com',
-          'youtu.be',
-          'youtube.com',
-          'music.youtube.com',
-          'www.music.youtube.com',
-        ];
-
-        if (YOUTUBE_HOSTS.includes(url.host)) {
-          // YouTube source
-          if (url.searchParams.get('list')) {
-            // YouTube playlist
-            newSongs.push(...await this.getSongs.youtubePlaylist(url.searchParams.get('list')!, shouldSplitChapters));
-          } else {
-            const songs = await this.getSongs.youtubeVideo(url.href, shouldSplitChapters);
-
-            if (songs) {
-              newSongs.push(...songs);
-            } else {
-              throw new Error('that doesn\'t exist');
-            }
-          }
-        } else if (url.protocol === 'spotify:' || url.host === 'open.spotify.com') {
-          const [convertedSongs, nSongsNotFound, totalSongs] = await this.getSongs.spotifySource(query, playlistLimit, shouldSplitChapters);
-
-          if (totalSongs > playlistLimit) {
-            extraMsg = `a random sample of ${playlistLimit} songs was taken`;
-          }
-
-          if (totalSongs > playlistLimit && nSongsNotFound !== 0) {
-            extraMsg += ' and ';
-          }
-
-          if (nSongsNotFound !== 0) {
-            if (nSongsNotFound === 1) {
-              extraMsg += '1 song was not found';
-            } else {
-              extraMsg += `${nSongsNotFound.toString()} songs were not found`;
-            }
-          }
-
-          newSongs.push(...convertedSongs);
-        } else if (url.host === 'soundcloud.com') {
-          if (url.pathname.includes('/sets/')) {
-            const songs = await this.getSongs.soundcloudPlaylist(url.href);
-            newSongs.push(...songs);
-          } else {
-            const songs = await this.getSongs.soundcloudVideo(url.href);
-
-            if (songs) {
-              newSongs.push(...songs);
-            } else {
-              throw new Error('that doesn\'t exist');
-            }
-          }
-        } else {
-          const song = await this.getSongs.httpLiveStream(query);
-
-          if (song) {
-            newSongs.push(song);
-          } else {
-            throw new Error('that doesn\'t exist');
-          }
-        }
-      } catch (_: unknown) {
-        // Not a URL, must search YouTube
-        const songs = await this.getSongs.youtubeVideoSearch(query, shouldSplitChapters);
-
-        if (songs) {
-          newSongs.push(...songs);
-        } else {
-          throw new Error('that doesn\'t exist');
-        }
-      }
-    }
+    let [newSongs, extraMsg] = await this.getSongs.getSongs(query, playlistLimit, shouldSplitChapters);
 
     if (newSongs.length === 0) {
       throw new Error('no songs found');
@@ -177,14 +80,13 @@ export default class AddQueryToQueue {
       newSongs = await Promise.all(newSongs.map(this.skipNonMusicSegments.bind(this)));
     }
 
-    const botName = this.config.BOT_NAME;
-    const memberUsername = member?.nickname ?? member?.user.username ?? botName;
+    const memberUsername = (await guild?.members.fetch(this.client.user!))?.displayName ?? 'API';
     const requestedByName = username ?? memberUsername;
     newSongs.forEach(song => {
       player.add({
         ...song,
-        addedInChannelId: interaction?.channel?.id ?? targetVoiceChannel?.id ?? botName,
-        requestedBy: username ?? member?.user.id ?? botName,
+        addedInChannelId: targetVoiceChannel?.id ?? guildId,
+        requestedBy: this.client.user!.id,
         requestedByName,
       }, {immediate: addToFrontOfQueue ?? false});
     });
@@ -194,10 +96,103 @@ export default class AddQueryToQueue {
     let statusMsg = '';
 
     if (player.voiceConnection === null) {
-      if (getSizeWithoutBots(targetVoiceChannel) === 0) {
+      if (!targetVoiceChannel || getSizeWithoutBots(targetVoiceChannel) === 0) {
         throw new Error('No one is in a channel, we cannot join');
       }
 
+      await player.connect(targetVoiceChannel);
+      await player.play();
+
+      if (wasPlayingSong) {
+        statusMsg = 'resuming playback';
+      }
+    } else if (player.status === STATUS.IDLE) {
+      await player.play();
+    }
+
+    if (skipCurrentTrack) {
+      try {
+        await player.forward(1);
+      } catch (_: unknown) {
+        throw new Error('no song to skip to');
+      }
+    }
+
+    if (statusMsg !== '') {
+      extraMsg = extraMsg === '' ? statusMsg : `${statusMsg}, ${extraMsg}`;
+    }
+
+    if (extraMsg !== '') {
+      extraMsg = ` (${extraMsg})`;
+    }
+
+    if (newSongs.length !== 1) {
+      return `u betcha, **${firstSong.title}** and ${newSongs.length - 1} other songs were added to the queue${extraMsg}`;
+    }
+
+    return `u betcha, **${firstSong.title}** added to the${addToFrontOfQueue ? ' front of the' : ''} queue${extraMsg}`;
+  }
+
+  public async addToQueue({
+    query,
+    addToFrontOfQueue,
+    shuffleAdditions,
+    shouldSplitChapters,
+    skipCurrentTrack,
+    interaction,
+  }: {
+    query: string;
+    addToFrontOfQueue: boolean;
+    shuffleAdditions: boolean;
+    shouldSplitChapters: boolean;
+    skipCurrentTrack: boolean;
+    interaction: ChatInputCommandInteraction;
+  }): Promise<void> {
+    const guildId = interaction.guild!.id;
+    const player = this.playerManager.get(guildId);
+    const currentQueueEntryId = player.getCurrentQueueEntryId();
+    const wasPlayingSong = currentQueueEntryId !== null;
+
+    const [targetVoiceChannel] = getMemberVoiceChannel(interaction.member as GuildMember) ?? getMostPopularVoiceChannel(interaction.guild!);
+
+    const settings = await getGuildSettings(guildId);
+
+    const {playlistLimit, queueAddResponseEphemeral} = settings;
+
+    await interaction.deferReply({ephemeral: queueAddResponseEphemeral});
+
+    let [newSongs, extraMsg] = await this.getSongs.getSongs(query, playlistLimit, shouldSplitChapters);
+
+    if (newSongs.length === 0) {
+      throw new Error('no songs found');
+    }
+
+    if (shuffleAdditions) {
+      newSongs = shuffle(newSongs);
+    }
+
+    if (this.config.ENABLE_SPONSORBLOCK) {
+      newSongs = await Promise.all(newSongs.map(this.skipNonMusicSegments.bind(this)));
+    }
+
+    newSongs.forEach((song, index) => {
+      player.add({
+        ...song,
+        addedInChannelId: interaction.channel!.id,
+        requestedBy: interaction.member!.user.id,
+        requestedByName: (interaction.member as GuildMember).displayName,
+      }, {
+        immediate: addToFrontOfQueue ?? false,
+        immediateOffset: index,
+      });
+    });
+
+    const firstSong = newSongs[0];
+
+    let statusMsg = '';
+    let shouldShowPlayingEmbed = false;
+
+    if (player.voiceConnection === null) {
       await player.connect(targetVoiceChannel);
 
       // Resume / start playback
@@ -207,19 +202,27 @@ export default class AddQueryToQueue {
         statusMsg = 'resuming playback';
       }
 
-      if (interaction) {
-        await interaction.editReply({
-          embeds: [buildPlayingMessageEmbed(player)],
-        });
-      }
+      shouldShowPlayingEmbed = true;
     } else if (player.status === STATUS.IDLE) {
       // Player is idle, start playback instead
       await player.play();
     }
 
-    if (skipCurrentTrack) {
+    if (!player.getCurrent()) {
+      throw new Error('no playable songs found');
+    }
+
+    if (shouldShowPlayingEmbed) {
+      await interaction.editReply({
+        embeds: [buildPlayingMessageEmbed(player)],
+      });
+    }
+
+    let didSkipCurrentTrack = false;
+    if (skipCurrentTrack && isSameQueueEntry(currentQueueEntryId, player.getCurrentQueueEntryId())) {
       try {
         await player.forward(1);
+        didSkipCurrentTrack = true;
       } catch (_: unknown) {
         throw new Error('no song to skip to');
       }
@@ -238,54 +241,18 @@ export default class AddQueryToQueue {
       extraMsg = ` (${extraMsg})`;
     }
 
-    if (newSongs.length !== 1) {
-      const message = `u betcha, **${firstSong.title}** and ${newSongs.length - 1} other songs were added to the queue${extraMsg}`;
-      if (interaction) {
-        await interaction.editReply(message);
-      }
-
-      return message;
+    if (newSongs.length === 1) {
+      await interaction.editReply(`u betcha, **${firstSong.title}** added to the${addToFrontOfQueue ? ' front of the' : ''} queue${didSkipCurrentTrack ? ' and current track skipped' : ''}${extraMsg}`);
+    } else {
+      await interaction.editReply(`u betcha, **${firstSong.title}** and ${newSongs.length - 1} other songs were added to the queue${didSkipCurrentTrack ? ' and current track skipped' : ''}${extraMsg}`);
     }
-
-    const message = `u betcha, **${firstSong.title}** added to the${addToFrontOfQueue ? ' front of the' : ''} queue${extraMsg}`;
-    if (interaction) {
-      await interaction.editReply(message);
-    }
-
-    return message;
-  }
-
-  public async addToQueue({
-    query,
-    addToFrontOfQueue,
-    shuffleAdditions,
-    shouldSplitChapters,
-    skipCurrentTrack,
-    interaction,
-  }: {
-    query: string;
-    addToFrontOfQueue: boolean;
-    shuffleAdditions: boolean;
-    shouldSplitChapters: boolean;
-    skipCurrentTrack: boolean;
-    interaction: ChatInputCommandInteraction;
-  }) {
-    return this.addToQueueInternal({
-      query,
-      addToFrontOfQueue,
-      shuffleAdditions,
-      shouldSplitChapters,
-      skipCurrentTrack,
-      interaction,
-      guildId: interaction.guild!.id,
-    });
   }
 
   private async skipNonMusicSegments(song: SongMetadata) {
     if (!this.sponsorBlock
-      || (this.sponsorBlockDisabledUntil && new Date() < this.sponsorBlockDisabledUntil)
-      || song.source !== MediaSource.Youtube
-      || !song.url) {
+          || (this.sponsorBlockDisabledUntil && new Date() < this.sponsorBlockDisabledUntil)
+          || song.source !== MediaSource.Youtube
+          || !song.url) {
       return song;
     }
 
@@ -303,7 +270,7 @@ export default class AddQueryToQueue {
           const previousSegment = acc[acc.length - 1];
           // If segments overlap merge
           if (previousSegment && previousSegment.endTime > startTime) {
-            acc[acc.length - 1].endTime = endTime;
+            acc[acc.length - 1].endTime = Math.max(previousSegment.endTime, endTime);
           } else {
             acc.push({startTime, endTime});
           }
@@ -313,14 +280,18 @@ export default class AddQueryToQueue {
 
       const intro = skipSegments[0];
       const outro = skipSegments.at(-1);
-      if (outro && outro?.endTime >= song.length - 2) {
-        song.length -= outro.endTime - outro.startTime;
+      const shouldTrimIntro = intro && intro.startTime <= 2;
+      const shouldTrimOutro = outro && outro.endTime >= song.length - 2;
+      if (shouldTrimOutro && (!shouldTrimIntro || outro !== intro)) {
+        song.length -= Math.max(0, outro.endTime - outro.startTime);
       }
 
-      if (intro?.startTime <= 2) {
-        song.offset = Math.floor(intro.endTime);
+      if (shouldTrimIntro) {
+        song.offset = Math.max(0, Math.floor(intro.endTime));
         song.length -= song.offset;
       }
+
+      song.length = Math.max(0, song.length);
 
       return song;
     } catch (e) {

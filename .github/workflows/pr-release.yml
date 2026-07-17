@@ -13,29 +13,31 @@ jobs:
     name: Release snapshot and comment in PR
     runs-on: ubuntu-latest
     permissions:
+      actions: read
       contents: read
       packages: write
+      pull-requests: write
       attestations: write
       id-token: write
     steps:
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v4
 
       - name: Download images
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: /tmp/images
           pattern: image-linux-*
           merge-multiple: true
           run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ secrets.GH_PAT }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Load image
         shell: bash
@@ -43,59 +45,62 @@ jobs:
           docker load -i /tmp/images/image-linux-amd64.tar
 
       - name: Download SHA
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: /tmp/SHA
-          pattern: sha
+          name: sha
           run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ secrets.GH_PAT }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Read SHA
         shell: bash
         run: |
-          echo "SHA=$(cat /tmp/SHA/sha/sha.txt | tr -d '\n')" >> $GITHUB_ENV
+          sha="$(tr -d '\n' < /tmp/SHA/sha.txt)"
+          echo "SHA=${sha}" >> "$GITHUB_ENV"
 
       - name: Push images
         run: |
           docker push ${{ env.REGISTRY_IMAGE }}:${{ env.SHA }}-linux-amd64
 
       - name: Download Docker metadata
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: /tmp/metadata
-          pattern: metadata
+          name: metadata
           run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ secrets.GH_PAT }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Read the metadata.json file
         id: metadata_reader
-        uses: juliangruber/read-file-action@v1.0.0
+        uses: juliangruber/read-file-action@v1.1.8
         with:
-          path: /tmp/metadata/metadata/metadata.json
+          path: /tmp/metadata/metadata.json
 
       - name: Download PR number
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: /tmp/pull_request_number
-          pattern: pull_request_number
+          name: pull_request_number
           run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ secrets.GH_PAT }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Read PR number
         shell: bash
         run: |
-          echo "PR_NUMBER=$(cat /tmp/pull_request_number/pull_request_number/pull_request_number.txt | tr -d '\n')" >> $GITHUB_ENV
+          pr_number="$(tr -d '\n' < /tmp/pull_request_number/pull_request_number.txt)"
+          echo "PR_NUMBER=${pr_number}" >> "$GITHUB_ENV"
 
       - name: Create manifest list and push
         run: |
-          docker buildx imagetools create $(cat /tmp/metadata/metadata/metadata.json | jq -cr '.tags | map("-t " + .) | join(" ")') ${{ env.REGISTRY_IMAGE }}:${{ env.SHA }}-linux-amd64
+          tags="$(jq -cr '.tags | map("-t " + .) | join(" ")' /tmp/metadata/metadata.json)"
+          docker buildx imagetools create ${tags} ${{ env.REGISTRY_IMAGE }}:${{ env.SHA }}-linux-amd64
 
       - name: Create comment
-        uses: marocchino/sticky-pull-request-comment@v2
+        uses: marocchino/sticky-pull-request-comment@v3.0.4
         with:
           header: "pr-release"
           number: ${{ env.PR_NUMBER }}
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           message: |
             #### :package: :robot: A new release has been made for this pull request.
 

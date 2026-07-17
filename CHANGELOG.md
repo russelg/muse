@@ -6,128 +6,123 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.15.3] - 2026-01-28
+## [2.11.10] - 2026-07-08
 
 ### Fixed
-- Tweak to use yt-dlp to download the content
+- Reverted non-root docker changes.
 
-## [2.15.2] - 2025-09-29
-
-### Fixed
-- Attempt to fix skip/next breaking queue.
-
-## [2.15.1] - 2025-09-28
-
-### Fixed
-- Github action updates
-
-## [2.15.0] - 2025-09-28
+## [2.11.9] - 2026-07-07
 
 ### Added
-- Use yt-dlp to get playback URLs
-- New `/random` command to queue songs randomly from the cache, when youtube is not working.
-
-## [2.14.0] - 2025-01-20
-
-### Added
-- Add simple proxy configuration
-
-## [2.13.5] - 2025-01-18
-
-### Fixed
-- Try grab video info again if formats empty
-
-## [2.13.4] - 2025-01-18
-
-### Fixed
-- Attempt to fix formats being undefined again
-
-## [2.13.3] - 2025-01-18
-
-### Fixed
-- Attempt to fix formats being undefined
-
-## [2.13.2] - 2025-01-18
-
-### Fixed
-- Remove arm64 builds
-
-## [2.13.1] - 2025-01-18
-
-### Fixed
-- Remove patches from Dockerfile
-
-## [2.13.0] - 2025-01-18
-
-### Fixed
-- Change back to @distube/ytdl-core for better playback support.
-
-## [2.12.0] - 2024-08-25
-
-### Added
-- Add `CACHE_DURATION_LIMIT_SECONDS` environment variable (defaults to 30 * 60, 30 minutes.)
-
-### Fixed
-- Use ffmpeg for seeking instead of play-dl
-
-## [2.11.0] - 2024-08-23
-
-### Added
-- Add `/unskip` endpoint
-- Add `skipCurrentTrack` to `/play` endpoint
+- `/health` endpoint for Docker HEALTHCHECK.
 
 ### Changed
-- Merged in upstream v2.9.3
+- Dockerfile: remove Deno, add build cache mounts, run as non-root `node` user.
 
-## [2.10.1] - 2024-08-04
+### Fixed
+- Config not being applied correctly to certain components.
+- Default `WEBSERVER_PORT` changed from 80 to 8080 for non-root Docker compatibility.
+- `yt-dlp` now uses Config parameters instead of raw `process.env`.
+
+## [2.11.8] - 2026-07-06
+
+### Fixed
+- Catch error when video is unavailable.
+
+## [2.11.7] - 2026-07-04
+
+### Fixed
+- Remove arm64 builder from CI workflows.
+
+## [2.11.6] - 2026-07-04
 
 ### Added
-- Add `/kill` command
+- REST API server with `/np`, `/play`, `/skip`, and `/unskip` endpoints, configurable via `WEBSERVER_PORT` and `WEBSERVER_PASSWORD`.
+- YouTube cookie support for improved playback reliability.
+- Support for additional JS runtimes; include Deno in the Docker image.
 
-## [2.10.0] - 2024-07-27
+## [2.11.5] - 2026-06-04
+
+- Fix queue-empty crashes when auto-announce is enabled or playback ends without a next song.
+- Fix Spotify autocomplete and token refresh failures so Spotify API errors do not terminate the bot.
+- Harden release, PR snapshot, and `yt-dlp` refresh workflow maintenance.
+
+## [2.11.4] - 2026-04-26
+- Add optional `YT_DLP_AUTO_UPDATE` startup refresh support and startup `YT_DLP_VERSION` logging.
+- Add scheduled, manual, and release-triggered GHCR image refreshes for the latest `yt-dlp`.
+- Improve Docker `yt-dlp` path handling so bundled installs remain overrideable and updateable.
+- Restore PR snapshot image comments and artifact paths.
+- Refresh GitHub Actions runtimes.
+
+## [2.11.3] - 2026-04-24
+- Improve YouTube format fetching fallback by retrying with both watch URL and video ID inputs.
+- Improve YouTube playback reliability by resolving playable media URLs with `yt-dlp`.
+- Include `yt-dlp` in the Docker image and document `YT_DLP_PATH` for direct Node.js installs.
+- Improve Discord voice connection reliability by waiting for the voice connection to become ready before playback.
+- Upgrade `@discordjs/voice` to pick up current Discord voice transport support.
+- Avoid disconnecting during voice connection handshakes when guild voice state updates arrive.
+
+## [2.11.2] - 2026-03-29
+- Improve YouTube playback reliability by updating ytdl-core and normalizing getInfo input
+
+## [2.11.1] - 2025-04-07
+- Revert Dockerfile to inherit dependencies image from base image
+
+## [2.11.0] - 2025-03-31
+- Updated ytdl-core to 4.16.5 distubejs/ytdl-core@4.15.9...4.16.6 which includes distubejs/ytdl-core@1f57d78 fixing the sig parsing
+- ytdl-core dropped node 18 support distubejs/ytdl-core@60f0ab1 so updated to latest Node LTS 22
+- Updated to @discordjs/opus v0.10.0 for Node 22 support
+- Updated to @discordjs/voice v0.18.0 to remove support for depricated encryption https://github.com/discordjs/discord.js/releases/tag/%40discordjs%2Fvoice%400.18.0
+
+## [2.10.1] - 2025-01-28
+- Remove Spotify requirement
+- Dependency update
+
+## [2.10.0] - 2024-11-04
+- New `/config set-reduce-vol-when-voice` command to automatically turn down the volume when people are speaking in the channel
+- New `/config set-reduce-vol-when-voice-target` command to set the target volume percentage (0-100) when people are speaking in the channel
+- Support for using only YouTube, spotify credentials are now optional.
+- Dependency update (Additional downgrade for p-queue)
+
+## [2.9.5] - 2024-10-29
+- Dependency update
+- Pull request #1040 merged (Used incorrect PR number, apoligies)
+
+## [2.9.4] - 2024-08-28
+
+### Added 
+- An optional `page-size` to `/queue` command 
+- Add `default-queue-page-size` setting
+
+## [2.9.3] - 2024-08-19
 
 ### Fixed
-- Added `/reset-volume` to attempt to reset the volume if normalization is screwed up.
-- Always check for the audio loudness level from the API, even if the file is cached.
 
-## [2.9.1] - 2024-06-25
+- bumped @discordjs/voice
+- bumped @distube/ytdl-core
+
+## [2.9.2] - 2024-08-18
+
+### Changed
+
+- Muse has new maintainers! I ([@codetheweb](https://github.com/codetheweb)) am stepping aside as I haven't used Muse myself for a few years and haven't been able to spend as much time on Muse as I'd like. See [this issue](https://github.com/museofficial/muse/issues/1063) for details. Welcome @museofficial/maintainers!
+- This repository has been moved to museofficial/muse.
+- Docker images are now published to `ghcr.io/museofficial/muse`. **Please update your image source if you use Docker**.
+
+## [2.9.1] - 2024-08-04
 
 ### Fixed
-- Disabled volume command because shit is mega broken
-- Switched to iOS client as a workaround (see: https://github.com/play-dl/play-dl/issues/370)
 
-## [2.9.0] - 2024-05-28
+- bumped ytdl-core
+
+## [2.9.0] - 2024-07-17
 
 ### Added
-- Add `/skip` endpoint
-- Username can be provided for API queue requests
+-  A `skip` option to the `/play` command
 
 ### Fixed
-- Fixed incorrect name being shown for discord queued song
-
-## [2.8.5] - 2024-05-27
-
-### Fixed
-- More CI updates
-
-## [2.8.4] - 2024-05-27
-
-### Fixed
-- More CI updates
-
-## [2.8.3] - 2024-05-27
-
-### Added
-- Added API for adding songs to the queue
-
-### Fixed
-- Fixed wrong node version for CI
-
-## [2.8.2] - 2024-05-27
-
-### Added
-- Added soundcloud support
-- Switched ytdl-core to play-dl (should resolve issues with longer videos)
+- Fixed playback issue
+- Audioplayer not stopping properly
 
 ## [2.8.1] - 2024-04-28
 
@@ -431,28 +426,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial release
 
-[unreleased]: https://github.com/russelg/muse/compare/v2.15.3...HEAD
-[2.15.3]: https://github.com/russelg/muse/compare/v2.15.2...v2.15.3
-[2.15.2]: https://github.com/russelg/muse/compare/v2.15.1...v2.15.2
-[2.15.1]: https://github.com/russelg/muse/compare/v2.15.0...v2.15.1
-[2.15.0]: https://github.com/russelg/muse/compare/v2.14.0...v2.15.0
-[2.14.0]: https://github.com/russelg/muse/compare/v2.13.5...v2.14.0
-[2.13.5]: https://github.com/russelg/muse/compare/v2.13.4...v2.13.5
-[2.13.4]: https://github.com/russelg/muse/compare/v2.13.3...v2.13.4
-[2.13.3]: https://github.com/russelg/muse/compare/v2.13.2...v2.13.3
-[2.13.2]: https://github.com/russelg/muse/compare/v2.13.1...v2.13.2
-[2.13.1]: https://github.com/russelg/muse/compare/v2.13.0...v2.13.1
-[2.13.0]: https://github.com/russelg/muse/compare/v2.12.0...v2.13.0
-[2.12.0]: https://github.com/russelg/muse/compare/v2.11.0...v2.12.0
-[2.11.0]: https://github.com/russelg/muse/compare/v2.9.3...v2.11.0
-[2.10.1]: https://github.com/russelg/muse/compare/v2.10.0...v2.10.1
-[2.10.0]: https://github.com/russelg/muse/compare/v2.9.1...v2.10.0
-[2.9.1]: https://github.com/russelg/muse/compare/v2.9.0...v2.9.1
-[2.9.0]: https://github.com/russelg/muse/compare/v2.8.5...v2.9.0
-[2.8.5]: https://github.com/russelg/muse/compare/v2.8.4...v2.8.5
-[2.8.4]: https://github.com/russelg/muse/compare/v2.8.3...v2.8.4
-[2.8.3]: https://github.com/russelg/muse/compare/v2.8.2...v2.8.3
-[2.8.2]: https://github.com/russelg/muse/compare/v2.8.1...v2.8.2
+[unreleased]: https://github.com/russelg/muse/compare/v2.11.10...HEAD
+[2.11.10]: https://github.com/russelg/muse/compare/v2.11.9...v2.11.10
+[2.11.9]: https://github.com/russelg/muse/compare/v2.11.8...v2.11.9
+[2.11.8]: https://github.com/russelg/muse/compare/v2.11.7...v2.11.8
+[2.11.7]: https://github.com/russelg/muse/compare/v2.11.6...v2.11.7
+[2.11.6]: https://github.com/russelg/muse/compare/v2.11.5...v2.11.6
+[2.11.5]: https://github.com/museofficial/muse/compare/v2.11.4...v2.11.5
+[2.11.4]: https://github.com/museofficial/muse/compare/v2.11.3...v2.11.4
+[2.11.3]: https://github.com/museofficial/muse/compare/v2.11.2...v2.11.3
+[2.11.2]: https://github.com/museofficial/muse/compare/v2.11.1...v2.11.2
+[2.11.1]: https://github.com/museofficial/muse/compare/v2.11.0...v2.11.1
+[2.11.0]: https://github.com/museofficial/muse/compare/v2.10.1...v2.11.0
+[2.10.1]: https://github.com/museofficial/muse/compare/v2.10.0...v2.10.1
+[2.10.0]: https://github.com/museofficial/muse/compare/v2.9.5...v2.10.0
+[2.9.5]: https://github.com/museofficial/muse/compare/v2.9.4...v2.9.5
+[2.9.4]: https://github.com/codetheweb/muse/compare/v2.9.3...v2.9.4
+[2.9.3]: https://github.com/codetheweb/muse/compare/v2.9.2...v2.9.3
+[2.9.2]: https://github.com/codetheweb/muse/compare/v2.9.1...v2.9.2
+[2.9.1]: https://github.com/codetheweb/muse/compare/v2.9.0...v2.9.1
+[2.9.0]: https://github.com/codetheweb/muse/compare/v2.8.1...v2.9.0
 [2.8.1]: https://github.com/codetheweb/muse/compare/v2.8.0...v2.8.1
 [2.8.0]: https://github.com/codetheweb/muse/compare/v2.7.1...v2.8.0
 [2.7.1]: https://github.com/codetheweb/muse/compare/v2.7.0...v2.7.1

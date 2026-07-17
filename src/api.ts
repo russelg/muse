@@ -30,10 +30,6 @@ const getSongTitleInfo = ({title, url, offset, source}: QueuedSong) => {
     return {title, url, youtubeId: null, source: 'HLS'};
   }
 
-  if (source === MediaSource.SoundCloud) {
-    return {title, url, youtubeId: null, source: 'Soundcloud'};
-  }
-
   const songTitle = title.replace(/\[.*\]/, '').trim();
   const youtubeId = url.length === 11 ? url : getYouTubeID(url) ?? '';
 
@@ -54,6 +50,8 @@ export default class {
     @inject(TYPES.Config) private readonly config: Config,
     @inject(TYPES.Services.AddQueryToQueue) private readonly addQueryToQueue: AddQueryToQueue,
   ) {
+    this.app.get('/health', (_req, res) => res.send({status: 'ok'}));
+
     this.app.get('/np/:guildId', async (req, res) => {
       try {
         const {guildId} = req.params;
@@ -106,7 +104,7 @@ export default class {
       try {
         const {guildId, password} = req.params;
 
-        if (this.config.WEBSERVER_PASSWORD !== password) {
+        if (this.config.WEBSERVER_PASSWORD && this.config.WEBSERVER_PASSWORD !== password) {
           throw new Error('Unauthorized');
         }
 
@@ -137,7 +135,7 @@ export default class {
       try {
         const {guildId, password} = req.params;
 
-        if (this.config.WEBSERVER_PASSWORD !== password) {
+        if (this.config.WEBSERVER_PASSWORD && this.config.WEBSERVER_PASSWORD !== password) {
           throw new Error('Unauthorized');
         }
 
@@ -160,7 +158,7 @@ export default class {
       try {
         const {guildId, password} = req.params;
 
-        if (this.config.WEBSERVER_PASSWORD !== password) {
+        if (this.config.WEBSERVER_PASSWORD && this.config.WEBSERVER_PASSWORD !== password) {
           throw new Error('Unauthorized');
         }
 

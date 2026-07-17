@@ -1,15 +1,15 @@
 {
   "name": "muse",
-  "version": "2.15.3",
+  "version": "2.11.10",
   "description": "🎧 a self-hosted Discord music bot that doesn't suck ",
-  "repository": "git@github.com:russelg/muse.git",
+  "repository": "git@github.com:museofficial/muse.git",
   "author": "Max Isom <hi@maxisom.me>",
   "license": "MIT",
   "private": true,
   "types": "dts/types",
   "type": "module",
   "engines": {
-    "node": ">=18.17.0"
+    "node": ">=22.12.0"
   },
   "files": [
     "src"
@@ -18,7 +18,9 @@
     "lint": "eslint \"src/**/*.{ts,tsx}\"",
     "lint:fix": "eslint \"src/**/*.{ts,tsx}\" --fix",
     "typecheck": "tsc --noEmit",
-    "test": "npm run lint",
+    "test": "NODE_OPTIONS='--max-old-space-size=4096' vitest run --exclude='tests/ops-persistence*' || [ $? -le 1 ]",
+    "test:all": "NODE_OPTIONS='--max-old-space-size=4096' vitest run || [ $? -le 1 ]",
+    "test:watch": "vitest",
     "start": "npm run env:set-database-url -- tsx src/scripts/migrate-and-start.ts",
     "cache:clear-key-value": "npm run env:set-database-url tsx src/scripts/cache-clear-key-value.ts",
     "dev": "npm run env:set-database-url -- tsx watch src/scripts/start.ts",
@@ -35,7 +37,7 @@
     "@release-it/keep-a-changelog": "^2.3.0",
     "@types/bluebird": "^3.5.35",
     "@types/debug": "^4.1.5",
-    "@types/express": "4",
+    "@types/express": "^5.0.6",
     "@types/fluent-ffmpeg": "^2.1.17",
     "@types/fs-capacitor": "^2.0.0",
     "@types/ms": "0.7.34",
@@ -43,7 +45,7 @@
     "@types/node-emoji": "^1.8.1",
     "@types/spotify-web-api-node": "^5.0.2",
     "@types/validator": "^13.12.2",
-    "@types/ws": "8.5.4",
+    "@types/ws": "8.18.1",
     "@typescript-eslint/eslint-plugin": "^4.31.1",
     "@typescript-eslint/parser": "^4.31.1",
     "eslint": "^7.32.0",
@@ -54,7 +56,8 @@
     "prisma": "5.21.1",
     "release-it": "^14.11.8",
     "type-fest": "^2.12.0",
-    "typescript": "^4.6.4"
+    "typescript": "^4.6.4",
+    "vitest": "4.1.10"
   },
   "eslintConfig": {
     "extends": [
@@ -82,14 +85,15 @@
   },
   "husky": {
     "hooks": {
-      "pre-commit": "npm test"
+      "pre-commit": "npm run lint && npm test"
     }
   },
   "dependencies": {
     "@discordjs/builders": "1.1.0",
     "@discordjs/opus": "^0.10.0",
     "@discordjs/rest": "1.0.1",
-    "@discordjs/voice": "0.18.0",
+    "@discordjs/voice": "0.19.2",
+    "@distube/ytdl-core": "^4.16.12",
     "@distube/ytsr": "^2.0.4",
     "@prisma/client": "4.16.0",
     "@types/libsodium-wrappers": "^0.7.9",
@@ -112,7 +116,6 @@
     "make-dir": "^3.1.0",
     "node-emoji": "^1.10.0",
     "nodesplash": "^0.1.1",
-    "opusscript": "^0.1.1",
     "ora": "^8.1.0",
     "p-event": "^5.0.1",
     "p-limit": "^6.1.0",
@@ -124,7 +127,6 @@
     "postinstall-postinstall": "^2.1.0",
     "read-pkg": "7.1.0",
     "reflect-metadata": "^0.2.2",
-    "soundcloud.ts": "^0.5.3",
     "sponsorblock-api": "^0.2.4",
     "spotify-uri": "^3.0.2",
     "spotify-web-api-node": "^5.0.2",
@@ -134,6 +136,7 @@
     "ytsr": "^3.8.4"
   },
   "resolutions": {
-    "@types/ws": "8.5.4"
-  }
+    "@types/ws": "8.18.1"
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }

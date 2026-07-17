@@ -1,115 +1,126 @@
-import {inject, injectable} from 'inversify';
+import {inject, injectable, optional} from 'inversify';
 import * as spotifyURI from 'spotify-uri';
-import {MediaSource, QueuedPlaylist, SongMetadata} from './player.js';
+import {SongMetadata, QueuedPlaylist, MediaSource} from './player.js';
 import {TYPES} from '../types.js';
 import ffmpeg from 'fluent-ffmpeg';
 import YoutubeAPI from './youtube-api.js';
 import SpotifyAPI, {SpotifyTrack} from './spotify-api.js';
-import SoundcloudAPI from './soundcloud-api.js';
-import FileCacheProvider from './file-cache.js';
-import {spawn} from 'child_process';
-import {parseTime} from '../utils/time.js';
-import debug from '../utils/debug.js';
+import {URL} from 'node:url';
 
 @injectable()
 export default class {
-  constructor(@inject(TYPES.Services.YoutubeAPI) private readonly youtubeAPI: YoutubeAPI,
-    @inject(TYPES.Services.SpotifyAPI) private readonly spotifyAPI: SpotifyAPI,
-    @inject(TYPES.Services.SoundCloudAPI) private readonly soundcloudAPI: SoundcloudAPI,
-    @inject(TYPES.FileCache) private readonly fileCacheProvider: FileCacheProvider,
-  ) {
+  private readonly youtubeAPI: YoutubeAPI;
+  private readonly spotifyAPI?: SpotifyAPI;
+
+  constructor(@inject(TYPES.Services.YoutubeAPI) youtubeAPI: YoutubeAPI, @inject(TYPES.Services.SpotifyAPI) @optional() spotifyAPI?: SpotifyAPI) {
+    this.youtubeAPI = youtubeAPI;
+    this.spotifyAPI = spotifyAPI;
   }
 
-  async youtubeVideoSearch(query: string, shouldSplitChapters: boolean): Promise<SongMetadata[]> {
+  async getSongs(query: string, playlistLimit: number, shouldSplitChapters: boolean): Promise<[SongMetadata[], string]> {
+    const newSongs: SongMetadata[] = [];
+    let extraMsg = '';
+    let url: URL | undefined;
+
+    // Test if it's a complete URL
+    try {
+      url = new URL(query);
+    } catch (_: unknown) {
+      url = undefined;
+    }
+
+    const supportedProtocols = ['http:', 'https:', 'spotify:'];
+
+    if (!url || !supportedProtocols.includes(url.protocol)) {
+      // Not a supported provider URL, so search YouTube as free text.
+      const songs = await this.youtubeVideoSearch(query, shouldSplitChapters);
+
+      if (songs) {
+        newSongs.push(...songs);
+      } else {
+        throw new Error('that doesn\'t exist');
+      }
+
+      return [newSongs, extraMsg];
+    }
+
+    const YOUTUBE_HOSTS = [
+      'www.youtube.com',
+      'youtu.be',
+      'youtube.com',
+      'music.youtube.com',
+      'www.music.youtube.com',
+    ];
+
+    if (YOUTUBE_HOSTS.includes(url.host)) {
+      // YouTube source
+      if (url.searchParams.get('list')) {
+        // YouTube playlist
+        const songs = await this.youtubePlaylist(url.searchParams.get('list')!, shouldSplitChapters);
+        newSongs.push(...songs.slice(0, playlistLimit));
+      } else {
+        const songs = await this.youtubeVideo(url.href, shouldSplitChapters);
+
+        if (songs) {
+          newSongs.push(...songs);
+        } else {
+          throw new Error('that doesn\'t exist');
+        }
+      }
+    } else if (url.protocol === 'spotify:' || url.host === 'open.spotify.com') {
+      if (this.spotifyAPI === undefined) {
+        throw new Error('Spotify is not enabled!');
+      }
+
+      const [convertedSongs, nSongsNotFound, totalSongs] = await this.spotifySource(query, playlistLimit, shouldSplitChapters);
+
+      if (totalSongs > playlistLimit) {
+        extraMsg = `a random sample of ${playlistLimit} songs was taken`;
+      }
+
+      if (totalSongs > playlistLimit && nSongsNotFound !== 0) {
+        extraMsg += ' and ';
+      }
+
+      if (nSongsNotFound !== 0) {
+        if (nSongsNotFound === 1) {
+          extraMsg += '1 song was not found';
+        } else {
+          extraMsg += `${nSongsNotFound.toString()} songs were not found`;
+        }
+      }
+
+      newSongs.push(...convertedSongs);
+    } else {
+      const song = await this.httpLiveStream(query);
+
+      if (song) {
+        newSongs.push(song);
+      } else {
+        throw new Error('that doesn\'t exist');
+      }
+    }
+
+    return [newSongs, extraMsg];
+  }
+
+  private async youtubeVideoSearch(query: string, shouldSplitChapters: boolean): Promise<SongMetadata[]> {
     return this.youtubeAPI.search(query, shouldSplitChapters);
   }
 
-  async youtubeVideo(url: string, shouldSplitChapters: boolean): Promise<SongMetadata[]> {
+  private async youtubeVideo(url: string, shouldSplitChapters: boolean): Promise<SongMetadata[]> {
     return this.youtubeAPI.getVideo(url, shouldSplitChapters);
   }
 
-  async youtubePlaylist(listId: string, shouldSplitChapters: boolean): Promise<SongMetadata[]> {
+  private async youtubePlaylist(listId: string, shouldSplitChapters: boolean): Promise<SongMetadata[]> {
     return this.youtubeAPI.getPlaylist(listId, shouldSplitChapters);
   }
 
-  async soundcloudVideoSearch(query: string): Promise<SongMetadata[]> {
-    return this.soundcloudAPI.search(query);
-  }
+  private async spotifySource(url: string, playlistLimit: number, shouldSplitChapters: boolean): Promise<[SongMetadata[], number, number]> {
+    if (this.spotifyAPI === undefined) {
+      return [[], 0, 0];
+    }
 
-  async soundcloudVideo(url: string): Promise<SongMetadata[]> {
-    return this.soundcloudAPI.get(url);
-  }
-
-  async soundcloudPlaylist(listId: string): Promise<SongMetadata[]> {
-    return this.soundcloudAPI.getPlaylist(listId);
-  }
-
-  async soundcloudArtist(listId: string): Promise<SongMetadata[]> {
-    return this.soundcloudAPI.getArtist(listId);
-  }
-
-  async cacheSource(query: string) {
-    return Promise.all(query.split(';').map(async q => {
-      const url = q.replace('cache::', '');
-      const path = await this.fileCacheProvider.getPathFor(url);
-
-      if (!path) {
-        throw new Error(`Cache file "${url}" not found`);
-      }
-
-      const length = await this.getCacheFileDuration(path);
-      return {
-        url,
-        source: MediaSource.Cache,
-        isLive: false,
-        title: `Cached Song (${url.substring(0, 8)})`,
-        artist: 'Unknown Artist',
-        length,
-        offset: 0,
-        playlist: null,
-        thumbnailUrl: null,
-      };
-    }));
-  }
-
-  async getCacheFileDuration(path: string) {
-    return new Promise<number>(resolve => {
-      const ffmpegTime = spawn('ffmpeg', ['-i', path, '-f', 'null', '/dev/null']);
-
-      let stderr = '';
-      ffmpegTime.stderr.on('data', (data: Buffer) => {
-        stderr += data.toString();
-      });
-
-      ffmpegTime.on('close', (code: number) => {
-        if (code === 0) {
-          try {
-            // The regex pattern equivalent to [0-9]{1}:[0-9]{2}:[0-9]{2}
-            const pattern = /[0-9]{1}:[0-9]{2}:[0-9]{2}/g;
-
-            // Get all matches
-            const matches = stderr.match(pattern);
-
-            // Return the last match or null if no matches found
-            resolve(matches ? parseTime(matches[matches.length - 1]) ?? 0 : 0);
-          } catch (parseError: unknown) {
-            debug(`Failed to parse ffmpeg output: ${String(parseError)}`);
-            resolve(0);
-          }
-        } else {
-          debug(`ffmpeg failed with code ${code}: ${stderr}`);
-          resolve(0);
-        }
-      });
-
-      ffmpegTime.on('error', (error: Error) => {
-        debug(`Failed to spawn ffmpeg: ${error.message}`);
-        resolve(0);
-      });
-    });
-  }
-
-  async spotifySource(url: string, playlistLimit: number, shouldSplitChapters: boolean): Promise<[SongMetadata[], number, number]> {
     const parsed = spotifyURI.parse(url);
 
     switch (parsed.type) {
@@ -139,11 +150,12 @@ export default class {
     }
   }
 
-  async httpLiveStream(url: string): Promise<SongMetadata> {
+  private async httpLiveStream(url: string): Promise<SongMetadata> {
     return new Promise((resolve, reject) => {
       ffmpeg(url).ffprobe((err, _) => {
         if (err) {
-          reject();
+          reject(err);
+          return;
         }
 
         resolve({
@@ -170,6 +182,10 @@ export default class {
     // Count songs that couldn't be found
     const songs: SongMetadata[] = searchResults.reduce((accum: SongMetadata[], result) => {
       if (result.status === 'fulfilled') {
+        if (result.value.length === 0) {
+          nSongsNotFound++;
+        }
+
         for (const v of result.value) {
           accum.push({
             ...v,
