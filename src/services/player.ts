@@ -952,6 +952,7 @@ export default class {
         .noVideo()
         .audioCodec('libopus')
         .outputFormat('webm')
+        .audioFilters(this.config.NORMALIZE_VOLUME ? 'loudnorm=I=-16:LRA=11:TP=-1.5' : [])
         .on('error', error => {
           if (!hasReturnedStreamClosed) {
             reject(error);

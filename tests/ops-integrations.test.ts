@@ -127,6 +127,7 @@ const flushAsyncWork = async () => {
 const makeFfmpegCommand = () => {
   const command = {
     audioCodec: vi.fn(() => command),
+    audioFilters: vi.fn(() => command),
     inputOptions: vi.fn(() => command),
     kill: vi.fn(),
     noVideo: vi.fn(() => command),
